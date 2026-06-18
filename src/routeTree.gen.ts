@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppScheduleRouteImport } from './routes/_app.schedule'
+import { Route as AppAssetsRouteImport } from './routes/_app.assets'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -27,27 +28,35 @@ const AppScheduleRoute = AppScheduleRouteImport.update({
   path: '/schedule',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAssetsRoute = AppAssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assets': typeof AppAssetsRoute
   '/schedule': typeof AppScheduleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assets': typeof AppAssetsRoute
   '/schedule': typeof AppScheduleRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/_app/assets': typeof AppAssetsRoute
   '/_app/schedule': typeof AppScheduleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/schedule'
+  fullPaths: '/' | '/assets' | '/schedule'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/schedule'
-  id: '__root__' | '/' | '/_app' | '/_app/schedule'
+  to: '/' | '/assets' | '/schedule'
+  id: '__root__' | '/' | '/_app' | '/_app/assets' | '/_app/schedule'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -78,14 +87,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppScheduleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/assets': {
+      id: '/_app/assets'
+      path: '/assets'
+      fullPath: '/assets'
+      preLoaderRoute: typeof AppAssetsRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAssetsRoute: typeof AppAssetsRoute
   AppScheduleRoute: typeof AppScheduleRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAssetsRoute: AppAssetsRoute,
   AppScheduleRoute: AppScheduleRoute,
 }
 
