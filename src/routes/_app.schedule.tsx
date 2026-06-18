@@ -51,7 +51,7 @@ function SchedulePage() {
   }, [schedules]);
 
   const setYear = (delta: number) =>
-    navigate({ search: (prev) => ({ ...prev, year: prev.year + delta }) });
+    navigate({ search: (prev: { year: number }) => ({ ...prev, year: prev.year + delta }) });
 
   return (
     <div className="space-y-6">
