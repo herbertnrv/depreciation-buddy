@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      fixed_assets: {
+        Row: {
+          asset_number: string | null
+          category: string
+          created_at: string
+          description: string
+          disposal_date: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          purchase_date: string
+          purchase_price: number
+          rate_per_year: number
+          updated_at: string
+        }
+        Insert: {
+          asset_number?: string | null
+          category: string
+          created_at?: string
+          description: string
+          disposal_date?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          purchase_date: string
+          purchase_price: number
+          rate_per_year: number
+          updated_at?: string
+        }
+        Update: {
+          asset_number?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          disposal_date?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          purchase_date?: string
+          purchase_price?: number
+          rate_per_year?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
