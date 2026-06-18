@@ -251,3 +251,127 @@ function Field({
     </div>
   );
 }
+
+function ImportButton() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [parsed, setParsed] = useState<ParsedAsset[]>([]);
+  const [fileName, setFileName] = useState<string>("");
+  const [skipped, setSkipped] = useState(0);
+  const [busy, setBusy] = useState(false);
+
+  const onFile = async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const res = parseAssetWorkbook(buf);
+      setParsed(res.assets);
+      setSkipped(res.skipped);
+      setFileName(file.name);
+      setOpen(true);
+      if (res.assets.length === 0) {
+        toast.error("No importable rows found in this file.");
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const doImport = async () => {
+    if (parsed.length === 0) return;
+    setBusy(true);
+    try {
+      // Insert in chunks to stay well under request limits.
+      const chunkSize = 200;
+      for (let i = 0; i < parsed.length; i += chunkSize) {
+        const chunk = parsed.slice(i, i + chunkSize).map((a) => ({
+          asset_number: a.asset_number,
+          category: a.category,
+          description: a.description,
+          location: a.location,
+          purchase_date: a.purchase_date,
+          purchase_price: a.purchase_price,
+          rate_per_year: a.rate_per_year,
+        }));
+        const { error } = await supabase.from("fixed_assets").insert(chunk);
+        if (error) throw error;
+      }
+      await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
+      toast.success(`Imported ${parsed.length} assets`);
+      setOpen(false);
+      setParsed([]);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button variant="outline" asChild>
+        <label className="cursor-pointer">
+          <Upload className="h-4 w-4 mr-2" /> Import Excel
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) onFile(f);
+            }}
+          />
+        </label>
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Import preview — {fileName}</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground">
+            {parsed.length} asset(s) ready to import
+            {skipped > 0 && ` · ${skipped} row(s) skipped (missing date / price / rate)`}
+          </div>
+          <div className="max-h-96 overflow-auto rounded border border-border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>
+                  <th className="text-left p-2">Category</th>
+                  <th className="text-left p-2">Description</th>
+                  <th className="text-left p-2">Location</th>
+                  <th className="text-left p-2">Date</th>
+                  <th className="text-right p-2">Price</th>
+                  <th className="text-right p-2">Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.slice(0, 200).map((a, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="p-2 text-muted-foreground">{a.category}</td>
+                    <td className="p-2">{a.description}</td>
+                    <td className="p-2 text-muted-foreground">{a.location ?? "—"}</td>
+                    <td className="p-2 font-mono">{a.purchase_date}</td>
+                    <td className="p-2 text-right font-mono">{a.purchase_price.toLocaleString()}</td>
+                    <td className="p-2 text-right font-mono">{(a.rate_per_year * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {parsed.length > 200 && (
+              <div className="p-2 text-xs text-muted-foreground text-center">
+                …and {parsed.length - 200} more
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={doImport} disabled={busy || parsed.length === 0}>
+              {busy ? "Importing…" : `Import ${parsed.length} assets`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
