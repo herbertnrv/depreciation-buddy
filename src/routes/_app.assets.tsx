@@ -164,8 +164,9 @@ function AssetsPage() {
                 {editing ? "Save changes" : "Add asset"}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {isLoading && <p className="text-muted-foreground">Loading…</p>}
