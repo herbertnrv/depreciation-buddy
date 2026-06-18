@@ -130,12 +130,14 @@ function AssetsPage() {
             Master data — changes flow into every year's schedule automatically.
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={startNew}>
-              <Plus className="h-4 w-4 mr-2" /> Add asset
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <ImportButton />
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={startNew}>
+                <Plus className="h-4 w-4 mr-2" /> Add asset
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editing ? "Edit asset" : "New asset"}</DialogTitle>
