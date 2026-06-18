@@ -17,7 +17,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/assets")({
