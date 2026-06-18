@@ -77,14 +77,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Fixed Asset Register" },
+      { name: "description", content: "Fixed asset register with monthly straight-line depreciation and automatic year-end rollover." },
+      { property: "og:title", content: "Fixed Asset Register" },
+      { property: "og:description", content: "Monthly depreciation schedule with automatic year rollover." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
