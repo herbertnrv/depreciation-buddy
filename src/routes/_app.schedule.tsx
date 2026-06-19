@@ -67,9 +67,9 @@ function SchedulePage() {
     const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
     for (const [, rows] of sorted) {
       rows.sort((a, b) => {
-        const av = (a.asset[sort] ?? "") as string;
-        const bv = (b.asset[sort] ?? "") as string;
-        return cmp(av, bv, dir);
+        const av = (a.asset as Record<string, unknown>)[sort];
+        const bv = (b.asset as Record<string, unknown>)[sort];
+        return cmp(av == null ? "" : String(av), bv == null ? "" : String(bv), dir);
       });
     }
     return sorted;
