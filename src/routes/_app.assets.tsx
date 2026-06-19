@@ -17,9 +17,38 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Upload } from "lucide-react";
 import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
 import { toast } from "sonner";
+
+const LIFE_OPTIONS: { value: string; label: string; years: number | null }[] = [
+  { value: "1", label: "1 year (100%)", years: 1 },
+  { value: "2", label: "2 years (50%)", years: 2 },
+  { value: "5", label: "5 years (20%)", years: 5 },
+  { value: "10", label: "10 years (10%)", years: 10 },
+  { value: "20", label: "20 years (5%)", years: 20 },
+  { value: "forever", label: "No depreciation (e.g. Land)", years: null },
+  { value: "custom", label: "Custom…", years: null },
+];
+
+const LAND_CATEGORIES = ["land", "grundstück", "grundstuck"];
+const isLandCategory = (c: string) => LAND_CATEGORIES.includes(c.trim().toLowerCase());
+
+function lifeFromRate(ratePct: number): string {
+  if (ratePct === 0) return "forever";
+  const years = Math.round(100 / ratePct);
+  if ([1, 2, 5, 10, 20].includes(years) && Math.abs(100 / years - ratePct) < 0.01) {
+    return String(years);
+  }
+  return "custom";
+}
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
@@ -32,6 +61,7 @@ type FormState = {
   location: string;
   purchase_date: string;
   purchase_price: string;
+  useful_life: string; // "1" | "2" | "5" | "10" | "20" | "forever" | "custom"
   rate_per_year: string; // % e.g. "20"
   disposal_date: string;
   notes: string;
@@ -44,6 +74,7 @@ const blank: FormState = {
   location: "",
   purchase_date: new Date().toISOString().slice(0, 10),
   purchase_price: "",
+  useful_life: "5",
   rate_per_year: "20",
   disposal_date: "",
   notes: "",
@@ -101,6 +132,7 @@ function AssetsPage() {
 
   const startEdit = (a: AssetInput) => {
     setEditing(a);
+    const ratePct = Math.round(a.rate_per_year * 1000) / 10;
     setForm({
       asset_number: a.asset_number ?? "",
       category: a.category,
@@ -108,11 +140,28 @@ function AssetsPage() {
       location: a.location ?? "",
       purchase_date: a.purchase_date,
       purchase_price: String(a.purchase_price),
-      rate_per_year: String(Math.round(a.rate_per_year * 1000) / 10),
+      useful_life: lifeFromRate(ratePct),
+      rate_per_year: String(ratePct),
       disposal_date: a.disposal_date ?? "",
       notes: "",
     });
     setOpen(true);
+  };
+
+  const applyCategory = (v: string) => {
+    if (isLandCategory(v)) {
+      setForm({ ...form, category: v, useful_life: "forever", rate_per_year: "0" });
+    } else {
+      setForm({ ...form, category: v });
+    }
+  };
+
+  const applyLife = (v: string) => {
+    const opt = LIFE_OPTIONS.find((o) => o.value === v);
+    if (!opt) return;
+    if (v === "forever") setForm({ ...form, useful_life: v, rate_per_year: "0" });
+    else if (v === "custom") setForm({ ...form, useful_life: v });
+    else if (opt.years) setForm({ ...form, useful_life: v, rate_per_year: String(100 / opt.years) });
   };
 
   const startNew = () => {
@@ -143,7 +192,7 @@ function AssetsPage() {
               <DialogTitle>{editing ? "Edit asset" : "New asset"}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Category" value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
+              <Field label="Category" value={form.category} onChange={applyCategory} />
               <Field label="Asset number" value={form.asset_number} onChange={(v) => setForm({ ...form, asset_number: v })} />
               <div className="col-span-2">
                 <Field label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
@@ -151,7 +200,27 @@ function AssetsPage() {
               <Field label="Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} />
               <Field label="Purchase date" type="date" value={form.purchase_date} onChange={(v) => setForm({ ...form, purchase_date: v })} />
               <Field label="Purchase price" type="number" value={form.purchase_price} onChange={(v) => setForm({ ...form, purchase_price: v })} />
-              <Field label="Rate per year (%)" type="number" value={form.rate_per_year} onChange={(v) => setForm({ ...form, rate_per_year: v })} />
+              <div>
+                <Label className="mb-2 block">Useful life</Label>
+                <Select value={form.useful_life} onValueChange={applyLife}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LIFE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Field
+                label={
+                  form.useful_life === "custom"
+                    ? "Rate per year (%)"
+                    : "Rate per year (%) — auto"
+                }
+                type="number"
+                value={form.rate_per_year}
+                onChange={(v) => setForm({ ...form, rate_per_year: v, useful_life: "custom" })}
+              />
               <Field label="Disposal date (optional)" type="date" value={form.disposal_date} onChange={(v) => setForm({ ...form, disposal_date: v })} />
               <div className="col-span-2">
                 <Label className="mb-2 block">Notes</Label>
