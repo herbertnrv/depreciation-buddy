@@ -192,7 +192,7 @@ function AssetsPage() {
               <DialogTitle>{editing ? "Edit asset" : "New asset"}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Category" value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
+              <Field label="Category" value={form.category} onChange={applyCategory} />
               <Field label="Asset number" value={form.asset_number} onChange={(v) => setForm({ ...form, asset_number: v })} />
               <div className="col-span-2">
                 <Field label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
@@ -200,7 +200,27 @@ function AssetsPage() {
               <Field label="Location" value={form.location} onChange={(v) => setForm({ ...form, location: v })} />
               <Field label="Purchase date" type="date" value={form.purchase_date} onChange={(v) => setForm({ ...form, purchase_date: v })} />
               <Field label="Purchase price" type="number" value={form.purchase_price} onChange={(v) => setForm({ ...form, purchase_price: v })} />
-              <Field label="Rate per year (%)" type="number" value={form.rate_per_year} onChange={(v) => setForm({ ...form, rate_per_year: v })} />
+              <div>
+                <Label className="mb-2 block">Useful life</Label>
+                <Select value={form.useful_life} onValueChange={applyLife}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LIFE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Field
+                label={
+                  form.useful_life === "custom"
+                    ? "Rate per year (%)"
+                    : "Rate per year (%) — auto"
+                }
+                type="number"
+                value={form.rate_per_year}
+                onChange={(v) => setForm({ ...form, rate_per_year: v, useful_life: "custom" })}
+              />
               <Field label="Disposal date (optional)" type="date" value={form.disposal_date} onChange={(v) => setForm({ ...form, disposal_date: v })} />
               <div className="col-span-2">
                 <Label className="mb-2 block">Notes</Label>
