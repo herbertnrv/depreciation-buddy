@@ -61,6 +61,7 @@ type FormState = {
   location: string;
   purchase_date: string;
   purchase_price: string;
+  useful_life: string; // "1" | "2" | "5" | "10" | "20" | "forever" | "custom"
   rate_per_year: string; // % e.g. "20"
   disposal_date: string;
   notes: string;
@@ -73,6 +74,7 @@ const blank: FormState = {
   location: "",
   purchase_date: new Date().toISOString().slice(0, 10),
   purchase_price: "",
+  useful_life: "5",
   rate_per_year: "20",
   disposal_date: "",
   notes: "",
