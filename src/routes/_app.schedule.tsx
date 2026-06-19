@@ -66,7 +66,11 @@ function SchedulePage() {
     }
     const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
     for (const [, rows] of sorted) {
-      rows.sort((a, b) => cmp(a.asset[sort], b.asset[sort], dir));
+      rows.sort((a, b) => {
+        const av = (a.asset[sort] ?? "") as string;
+        const bv = (b.asset[sort] ?? "") as string;
+        return cmp(av, bv, dir);
+      });
     }
     return sorted;
   }, [schedules, sort, dir]);
@@ -78,14 +82,15 @@ function SchedulePage() {
     return out as number[];
   }, [schedules]);
 
+  type Search = z.infer<typeof searchSchema>;
   const setYear = (delta: number) =>
-    navigate({ search: (prev) => ({ ...prev, year: prev.year + delta }) });
+    navigate({ search: (prev: Search) => ({ ...prev, year: prev.year + delta }) });
 
   const setSort = (s: SortKey) =>
-    navigate({ search: (prev) => ({ ...prev, sort: s }) });
+    navigate({ search: (prev: Search) => ({ ...prev, sort: s }) });
 
   const setDir = (d: SortDir) =>
-    navigate({ search: (prev) => ({ ...prev, dir: d }) });
+    navigate({ search: (prev: Search) => ({ ...prev, dir: d }) });
 
   return (
     <div className="space-y-6">
