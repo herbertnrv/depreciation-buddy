@@ -8,11 +8,29 @@ import {
   MONTH_LABELS,
   type YearSchedule,
 } from "@/lib/depreciation";
+import { exportToExcel, exportToPDF } from "@/lib/export-schedule";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText,
+} from "lucide-react";
+
+type SortKey = "asset_number" | "location" | "purchase_date";
+type SortDir = "asc" | "desc";
 
 const searchSchema = z.object({
   year: z.coerce.number().int().min(1990).max(2100).catch(new Date().getFullYear()),
+  sort: z.enum(["asset_number", "location", "purchase_date"]).catch("purchase_date"),
+  dir: z.enum(["asc", "desc"]).catch("asc"),
 });
 
 export const Route = createFileRoute("/_app/schedule")({
@@ -20,8 +38,15 @@ export const Route = createFileRoute("/_app/schedule")({
   component: SchedulePage,
 });
 
+function cmp(a: string | null, b: string | null, dir: SortDir) {
+  const av = a ?? "";
+  const bv = b ?? "";
+  const r = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+  return dir === "asc" ? r : -r;
+}
+
 function SchedulePage() {
-  const { year } = Route.useSearch();
+  const { year, sort, dir } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { data: assets, isLoading, error } = useAssets();
 
@@ -29,19 +54,22 @@ function SchedulePage() {
     if (!assets) return [];
     return assets
       .map((a) => computeYearSchedule(a, year))
-      // hide assets not yet acquired AND fully written off before this year
       .filter((s) => s.openingCost > 0 || s.additions > 0 || s.disposals > 0);
   }, [assets, year]);
 
-  const groups = useMemo(() => {
+  const groups = useMemo<[string, YearSchedule[]][]>(() => {
     const map = new Map<string, YearSchedule[]>();
     for (const s of schedules) {
       const arr = map.get(s.asset.category) ?? [];
       arr.push(s);
       map.set(s.asset.category, arr);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [schedules]);
+    const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    for (const [, rows] of sorted) {
+      rows.sort((a, b) => cmp(a.asset[sort], b.asset[sort], dir));
+    }
+    return sorted;
+  }, [schedules, sort, dir]);
 
   const totals = useMemo(() => totalsOf(schedules), [schedules]);
   const monthlyTotals = useMemo(() => {
@@ -51,7 +79,13 @@ function SchedulePage() {
   }, [schedules]);
 
   const setYear = (delta: number) =>
-    navigate({ search: (prev: { year: number }) => ({ ...prev, year: prev.year + delta }) });
+    navigate({ search: (prev) => ({ ...prev, year: prev.year + delta }) });
+
+  const setSort = (s: SortKey) =>
+    navigate({ search: (prev) => ({ ...prev, sort: s }) });
+
+  const setDir = (d: SortDir) =>
+    navigate({ search: (prev) => ({ ...prev, dir: d }) });
 
   return (
     <div className="space-y-6">
@@ -64,16 +98,56 @@ function SchedulePage() {
             Opening balances roll forward automatically from {year - 1}.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setYear(-1)} aria-label="Previous year">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="px-4 py-2 rounded-md border border-border bg-card font-mono text-sm min-w-[80px] text-center">
-            {year}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Sort by</span>
+            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asset_number">Inventory #</SelectItem>
+                <SelectItem value="location">Location</SelectItem>
+                <SelectItem value="purchase_date">Purchase date</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={dir} onValueChange={(v) => setDir(v as SortDir)}>
+              <SelectTrigger className="w-[130px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Button variant="outline" size="icon" onClick={() => setYear(1)} aria-label="Next year">
-            <ChevronRight className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportToExcel(groups, year)}
+            disabled={schedules.length === 0}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportToPDF(groups, year)}
+            disabled={schedules.length === 0}
+          >
+            <FileText className="h-4 w-4 mr-2" /> PDF
+          </Button>
+          <div className="flex items-center gap-2 ml-2">
+            <Button variant="outline" size="icon" onClick={() => setYear(-1)} aria-label="Previous year">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="px-4 py-2 rounded-md border border-border bg-card font-mono text-sm min-w-[80px] text-center">
+              {year}
+            </div>
+            <Button variant="outline" size="icon" onClick={() => setYear(1)} aria-label="Next year">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -84,7 +158,7 @@ function SchedulePage() {
         <div className="rounded-lg border border-dashed border-border p-12 text-center">
           <p className="text-muted-foreground">No assets active in {year}.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Add assets in the “Assets” tab to populate the schedule.
+            Add assets in the "Assets" tab to populate the schedule.
           </p>
         </div>
       )}
@@ -94,7 +168,10 @@ function SchedulePage() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="text-left p-2 font-medium sticky left-0 bg-muted/50 z-10 min-w-[200px]">Asset</th>
+                <th className="text-left p-2 font-medium sticky left-0 bg-muted/50 z-10 min-w-[80px]">Inv #</th>
+                <th className="text-left p-2 font-medium min-w-[180px]">Description</th>
+                <th className="text-left p-2 font-medium">Location</th>
+                <th className="text-left p-2 font-medium">Purchased</th>
                 <th className="text-right p-2 font-medium">Cost 01.01</th>
                 <th className="text-right p-2 font-medium text-emerald-600 dark:text-emerald-400">Additions</th>
                 <th className="text-right p-2 font-medium text-red-600 dark:text-red-400">Disposals</th>
@@ -119,12 +196,16 @@ function SchedulePage() {
                   <FragmentGroup key={category} category={category}>
                     {rows.map((s) => (
                       <tr key={s.asset.id} className="border-b border-border hover:bg-muted/30">
-                        <td className="p-2 sticky left-0 bg-card z-10">
-                          <div className="font-medium text-foreground">{s.asset.description}</div>
-                          <div className="text-muted-foreground text-[10px]">
-                            {s.asset.asset_number ?? "—"} · {s.asset.purchase_date}
-                            {s.asset.disposal_date && ` · disposed ${s.asset.disposal_date}`}
-                          </div>
+                        <td className="p-2 sticky left-0 bg-card z-10 font-mono text-[10px]">
+                          {s.asset.asset_number ?? "—"}
+                        </td>
+                        <td className="p-2 font-medium text-foreground">{s.asset.description}</td>
+                        <td className="p-2 text-muted-foreground">{s.asset.location ?? "—"}</td>
+                        <td className="p-2 font-mono text-[10px]">
+                          {s.asset.purchase_date}
+                          {s.asset.disposal_date && (
+                            <div className="text-muted-foreground">disp. {s.asset.disposal_date}</div>
+                          )}
                         </td>
                         <td className="text-right p-2 font-mono">{formatMoney(s.openingCost)}</td>
                         <td className="text-right p-2 font-mono text-emerald-600 dark:text-emerald-400">{formatMoney(s.additions)}</td>
@@ -167,7 +248,7 @@ function FragmentGroup({
   return (
     <>
       <tr className="bg-secondary/60">
-        <td colSpan={20} className="p-2 text-xs font-semibold uppercase tracking-wide text-secondary-foreground sticky left-0">
+        <td colSpan={23} className="p-2 text-xs font-semibold uppercase tracking-wide text-secondary-foreground sticky left-0">
           {category}
         </td>
       </tr>
@@ -215,7 +296,8 @@ function SubtotalRow({
   const bg = tone === "grand" ? "bg-primary/10 font-bold" : "bg-muted/40 font-semibold";
   return (
     <tr className={`${bg} border-b border-border`}>
-      <td className={`p-2 text-foreground sticky left-0 ${bg}`}>{label}</td>
+      <td className={`p-2 ${bg}`} />
+      <td className={`p-2 text-foreground ${bg}`} colSpan={3}>{label}</td>
       <td className="text-right p-2 font-mono">{formatMoney(totals.openingCost)}</td>
       <td className="text-right p-2 font-mono text-emerald-700 dark:text-emerald-300">{formatMoney(totals.additions)}</td>
       <td className="text-right p-2 font-mono text-red-700 dark:text-red-300">{formatMoney(totals.disposals)}</td>
