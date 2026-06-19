@@ -132,6 +132,7 @@ function AssetsPage() {
 
   const startEdit = (a: AssetInput) => {
     setEditing(a);
+    const ratePct = Math.round(a.rate_per_year * 1000) / 10;
     setForm({
       asset_number: a.asset_number ?? "",
       category: a.category,
@@ -139,11 +140,28 @@ function AssetsPage() {
       location: a.location ?? "",
       purchase_date: a.purchase_date,
       purchase_price: String(a.purchase_price),
-      rate_per_year: String(Math.round(a.rate_per_year * 1000) / 10),
+      useful_life: lifeFromRate(ratePct),
+      rate_per_year: String(ratePct),
       disposal_date: a.disposal_date ?? "",
       notes: "",
     });
     setOpen(true);
+  };
+
+  const applyCategory = (v: string) => {
+    if (isLandCategory(v)) {
+      setForm({ ...form, category: v, useful_life: "forever", rate_per_year: "0" });
+    } else {
+      setForm({ ...form, category: v });
+    }
+  };
+
+  const applyLife = (v: string) => {
+    const opt = LIFE_OPTIONS.find((o) => o.value === v);
+    if (!opt) return;
+    if (v === "forever") setForm({ ...form, useful_life: v, rate_per_year: "0" });
+    else if (v === "custom") setForm({ ...form, useful_life: v });
+    else if (opt.years) setForm({ ...form, useful_life: v, rate_per_year: String(100 / opt.years) });
   };
 
   const startNew = () => {
