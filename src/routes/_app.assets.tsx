@@ -17,9 +17,38 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Upload } from "lucide-react";
 import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
 import { toast } from "sonner";
+
+const LIFE_OPTIONS: { value: string; label: string; years: number | null }[] = [
+  { value: "1", label: "1 year (100%)", years: 1 },
+  { value: "2", label: "2 years (50%)", years: 2 },
+  { value: "5", label: "5 years (20%)", years: 5 },
+  { value: "10", label: "10 years (10%)", years: 10 },
+  { value: "20", label: "20 years (5%)", years: 20 },
+  { value: "forever", label: "No depreciation (e.g. Land)", years: null },
+  { value: "custom", label: "Custom…", years: null },
+];
+
+const LAND_CATEGORIES = ["land", "grundstück", "grundstuck"];
+const isLandCategory = (c: string) => LAND_CATEGORIES.includes(c.trim().toLowerCase());
+
+function lifeFromRate(ratePct: number): string {
+  if (ratePct === 0) return "forever";
+  const years = Math.round(100 / ratePct);
+  if ([1, 2, 5, 10, 20].includes(years) && Math.abs(100 / years - ratePct) < 0.01) {
+    return String(years);
+  }
+  return "custom";
+}
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
