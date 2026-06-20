@@ -24,9 +24,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, AlertCircle } from "lucide-react";
 import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+
+function validateForm(form: FormState): string[] {
+  const errs: string[] = [];
+  const price = Number(form.purchase_price);
+  if (!form.purchase_price || isNaN(price) || price <= 0) {
+    errs.push("Purchase price must be greater than 0. Enter a positive number (e.g. 1500).");
+  }
+  if (form.disposal_date) {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const d = new Date(form.disposal_date);
+    if (isNaN(d.getTime())) {
+      errs.push("Disposal date is not a valid date.");
+    } else if (d.getTime() > today.getTime()) {
+      errs.push("Disposal date must be today or in the past — future dates are not allowed.");
+    }
+    if (form.purchase_date) {
+      const p = new Date(form.purchase_date);
+      if (!isNaN(p.getTime()) && d.getTime() < p.getTime()) {
+        errs.push("Disposal date cannot be before the purchase date.");
+      }
+    }
+  }
+  return errs;
+}
 
 const LIFE_OPTIONS: { value: string; label: string; years: number | null }[] = [
   { value: "1", label: "1 year (100%)", years: 1 },
