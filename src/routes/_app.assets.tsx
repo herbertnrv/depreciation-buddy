@@ -251,15 +251,26 @@ function AssetsPage() {
                 value={form.rate_per_year}
                 onChange={(v) => setForm({ ...form, rate_per_year: v, useful_life: "custom" })}
               />
-              <Field label="Disposal date (optional)" type="date" value={form.disposal_date} onChange={(v) => setForm({ ...form, disposal_date: v })} />
+              <Field label="Disposal date (optional)" type="date" max={new Date().toISOString().slice(0, 10)} value={form.disposal_date} onChange={(v) => setForm({ ...form, disposal_date: v })} />
               <div className="col-span-2">
                 <Label className="mb-2 block">Notes</Label>
                 <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
+            {errors.length > 0 && (form.purchase_price !== "" || form.disposal_date !== "") && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Please fix the following before saving</AlertTitle>
+                <AlertDescription>
+                  <ul className="list-disc pl-5 space-y-1 mt-1">
+                    {errors.map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={() => upsert.mutate()} disabled={upsert.isPending || !form.description || !form.purchase_price}>
+              <Button onClick={() => upsert.mutate()} disabled={upsert.isPending || !form.description || errors.length > 0}>
                 {editing ? "Save changes" : "Add asset"}
               </Button>
             </DialogFooter>
