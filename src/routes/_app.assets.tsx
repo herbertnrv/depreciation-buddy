@@ -24,9 +24,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, AlertCircle } from "lucide-react";
 import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+
+function validateForm(form: FormState): string[] {
+  const errs: string[] = [];
+  const price = Number(form.purchase_price);
+  if (!form.purchase_price || isNaN(price) || price <= 0) {
+    errs.push("Purchase price must be greater than 0. Enter a positive number (e.g. 1500).");
+  }
+  if (form.disposal_date) {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const d = new Date(form.disposal_date);
+    if (isNaN(d.getTime())) {
+      errs.push("Disposal date is not a valid date.");
+    } else if (d.getTime() > today.getTime()) {
+      errs.push("Disposal date must be today or in the past — future dates are not allowed.");
+    }
+    if (form.purchase_date) {
+      const p = new Date(form.purchase_date);
+      if (!isNaN(p.getTime()) && d.getTime() < p.getTime()) {
+        errs.push("Disposal date cannot be before the purchase date.");
+      }
+    }
+  }
+  return errs;
+}
 
 const LIFE_OPTIONS: { value: string; label: string; years: number | null }[] = [
   { value: "1", label: "1 year (100%)", years: 1 },
@@ -87,8 +113,12 @@ function AssetsPage() {
   const [editing, setEditing] = useState<AssetInput | null>(null);
   const [form, setForm] = useState<FormState>(blank);
 
+  const errors = validateForm(form);
+
   const upsert = useMutation({
     mutationFn: async () => {
+      const errs = validateForm(form);
+      if (errs.length > 0) throw new Error(errs[0]);
       const payload = {
         asset_number: form.asset_number || null,
         category: form.category.trim(),
@@ -221,15 +251,26 @@ function AssetsPage() {
                 value={form.rate_per_year}
                 onChange={(v) => setForm({ ...form, rate_per_year: v, useful_life: "custom" })}
               />
-              <Field label="Disposal date (optional)" type="date" value={form.disposal_date} onChange={(v) => setForm({ ...form, disposal_date: v })} />
+              <Field label="Disposal date (optional)" type="date" max={new Date().toISOString().slice(0, 10)} value={form.disposal_date} onChange={(v) => setForm({ ...form, disposal_date: v })} />
               <div className="col-span-2">
                 <Label className="mb-2 block">Notes</Label>
                 <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
             </div>
+            {errors.length > 0 && (form.purchase_price !== "" || form.disposal_date !== "") && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Please fix the following before saving</AlertTitle>
+                <AlertDescription>
+                  <ul className="list-disc pl-5 space-y-1 mt-1">
+                    {errors.map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={() => upsert.mutate()} disabled={upsert.isPending || !form.description || !form.purchase_price}>
+              <Button onClick={() => upsert.mutate()} disabled={upsert.isPending || !form.description || errors.length > 0}>
                 {editing ? "Save changes" : "Add asset"}
               </Button>
             </DialogFooter>
@@ -307,16 +348,18 @@ function Field({
   value,
   onChange,
   type = "text",
+  max,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  max?: string;
 }) {
   return (
     <div>
       <Label className="mb-2 block">{label}</Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input type={type} value={value} max={max} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
