@@ -113,8 +113,12 @@ function AssetsPage() {
   const [editing, setEditing] = useState<AssetInput | null>(null);
   const [form, setForm] = useState<FormState>(blank);
 
+  const errors = validateForm(form);
+
   const upsert = useMutation({
     mutationFn: async () => {
+      const errs = validateForm(form);
+      if (errs.length > 0) throw new Error(errs[0]);
       const payload = {
         asset_number: form.asset_number || null,
         category: form.category.trim(),
