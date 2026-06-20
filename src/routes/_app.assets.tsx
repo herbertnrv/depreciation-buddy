@@ -348,16 +348,18 @@ function Field({
   value,
   onChange,
   type = "text",
+  max,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  max?: string;
 }) {
   return (
     <div>
       <Label className="mb-2 block">{label}</Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input type={type} value={value} max={max} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
