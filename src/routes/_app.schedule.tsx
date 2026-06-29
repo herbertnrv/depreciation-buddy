@@ -51,6 +51,8 @@ const searchSchema = z.object({
   year: z.coerce.number().int().min(1990).max(2100).catch(new Date().getFullYear()),
   sort: z.enum(SORT_KEYS).catch("purchase_date"),
   dir: z.enum(["asc", "desc"]).catch("asc"),
+  category: z.string().optional().catch(undefined),
+  catDir: z.enum(["asc", "desc"]).catch("asc"),
 });
 
 export const Route = createFileRoute("/_app/schedule")({
