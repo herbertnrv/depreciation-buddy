@@ -221,7 +221,11 @@ function AssetsPage() {
               <DialogTitle>{editing ? "Edit asset" : "New asset"}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Category" value={form.category} onChange={applyCategory} />
+              <CategoryField
+                value={form.category}
+                onChange={applyCategory}
+                existing={Array.from(new Set((assets ?? []).map((a) => a.category).filter(Boolean))).sort((a, b) => a.localeCompare(b))}
+              />
               <Field label="Asset number" value={form.asset_number} onChange={(v) => setForm({ ...form, asset_number: v })} />
               <div className="col-span-2">
                 <Field label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
@@ -359,6 +363,63 @@ function Field({
     <div>
       <Label className="mb-2 block">{label}</Label>
       <Input type={type} value={value} max={max} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function CategoryField({
+  value,
+  onChange,
+  existing,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  existing: string[];
+}) {
+  const NEW = "__new__";
+  const isExisting = existing.includes(value);
+  const [mode, setMode] = useState<"select" | "new">(
+    existing.length === 0 || (!isExisting && value !== "") ? "new" : "select"
+  );
+
+  return (
+    <div>
+      <Label className="mb-2 block">Category</Label>
+      {mode === "select" && existing.length > 0 ? (
+        <Select
+          value={isExisting ? value : ""}
+          onValueChange={(v) => {
+            if (v === NEW) {
+              setMode("new");
+              onChange("");
+            } else {
+              onChange(v);
+            }
+          }}
+        >
+          <SelectTrigger><SelectValue placeholder="Select category…" /></SelectTrigger>
+          <SelectContent>
+            {existing.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+            <SelectItem value={NEW}>+ New category…</SelectItem>
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="flex gap-2">
+          <Input
+            value={value}
+            placeholder="New category name"
+            onChange={(e) => onChange(e.target.value)}
+            autoFocus
+          />
+          {existing.length > 0 && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setMode("select")}>
+              ↩
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
