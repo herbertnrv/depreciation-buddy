@@ -206,6 +206,29 @@ function SchedulePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Category</span>
+            <Select value={category ?? "__all__"} onValueChange={setCategory}>
+              <SelectTrigger className="w-[200px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All categories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={catDir} onValueChange={(v) => setCatDir(v as "asc" | "desc")}>
+              <SelectTrigger className="w-[120px] h-9" title="Category order">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">A → Z</SelectItem>
+                <SelectItem value="desc">Z → A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="outline"
             size="sm"
