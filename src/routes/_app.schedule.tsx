@@ -394,6 +394,10 @@ function SummaryPreviewDialog({
 }) {
   const { rows, total } = useMemo(() => computeSummaryTotals(groups), [groups]);
   const company = "GastronoAssets — Hotel & Gastro Service";
+  const [place, setPlace] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [preparedBy, setPreparedBy] = useState("");
+  const [approvedBy, setApprovedBy] = useState("");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
