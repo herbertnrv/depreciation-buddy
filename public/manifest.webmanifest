@@ -1,0 +1,25 @@
+{
+  "name": "GastronoAssets — Hotel & Gastro Service",
+  "short_name": "GastronoAssets",
+  "description": "Offline fixed asset register with monthly straight-line depreciation and automatic year-end rollover.",
+  "start_url": "/schedule",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1b2b",
+  "theme_color": "#0b1b2b",
+  "icons": [
+    {
+      "src": "/icons/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

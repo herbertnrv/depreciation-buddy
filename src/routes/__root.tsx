@@ -82,12 +82,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "GastronoAssets — Hotel & Gastro Service" },
       { property: "og:description", content: "Offline fixed asset register for hotels and gastronomy." },
       { property: "og:type", content: "website" },
+      { name: "theme-color", content: "#0b1b2b" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", type: "image/png", href: "/icons/icon.png" },
+      { rel: "apple-touch-icon", href: "/icons/icon.png" },
     ],
   }),
   shellComponent: RootShell,
