@@ -359,7 +359,7 @@ function SchedulePage() {
       )}
 
       {schedules.length > 0 && (
-        <div className="rounded-lg border border-border bg-card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[calc(100vh-240px)]">
           <table className="w-full text-xs">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr className="border-b border-border">
