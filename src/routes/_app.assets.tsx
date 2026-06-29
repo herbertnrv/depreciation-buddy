@@ -221,7 +221,11 @@ function AssetsPage() {
               <DialogTitle>{editing ? "Edit asset" : "New asset"}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Category" value={form.category} onChange={applyCategory} />
+              <CategoryField
+                value={form.category}
+                onChange={applyCategory}
+                existing={Array.from(new Set((assets ?? []).map((a) => a.category).filter(Boolean))).sort((a, b) => a.localeCompare(b))}
+              />
               <Field label="Asset number" value={form.asset_number} onChange={(v) => setForm({ ...form, asset_number: v })} />
               <div className="col-span-2">
                 <Field label="Description" value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
