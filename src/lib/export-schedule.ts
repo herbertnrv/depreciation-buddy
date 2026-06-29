@@ -203,3 +203,143 @@ function fmtCell(n: number): string {
     maximumFractionDigits: 2,
   }).format(n);
 }
+
+export function exportSummaryPDF(
+  groups: [string, YearSchedule[]][],
+  year: number,
+  companyName = "GastronoAssets — Hotel & Gastro Service",
+) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  // Header: company name top right
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text(companyName, pageW - 40, 40, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(
+    `Stand: 31.12.${year}`,
+    pageW - 40,
+    55,
+    { align: "right" },
+  );
+
+  // Title left
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Anlagenspiegel — Zusammenfassung", 40, 45);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Buchungsjahr ${year}`, 40, 62);
+
+  // Build category totals
+  type Tot = {
+    category: string;
+    cost: number;
+    nbvOpen: number;
+    add: number;
+    disp: number;
+    depr: number;
+    nbvClose: number;
+  };
+  const rows: Tot[] = [];
+  const g: Tot = {
+    category: "Gesamt",
+    cost: 0, nbvOpen: 0, add: 0, disp: 0, depr: 0, nbvClose: 0,
+  };
+  for (const [category, schedules] of groups) {
+    const t: Tot = { category, cost: 0, nbvOpen: 0, add: 0, disp: 0, depr: 0, nbvClose: 0 };
+    for (const s of schedules) {
+      t.cost += s.asset.purchase_price;
+      t.nbvOpen += s.openingNBV;
+      t.add += s.additions;
+      t.disp += s.disposals;
+      t.depr += s.yearDepreciation;
+      t.nbvClose += s.closingNBV;
+    }
+    rows.push(t);
+    g.cost += t.cost;
+    g.nbvOpen += t.nbvOpen;
+    g.add += t.add;
+    g.disp += t.disp;
+    g.depr += t.depr;
+    g.nbvClose += t.nbvClose;
+  }
+
+  const HEAD = [[
+    "Kategorie",
+    "Anschaffungspreis",
+    "Buchwert 01.01.",
+    "Zugang",
+    "Abgang",
+    "Abschreibung",
+    "Buchwert 31.12.",
+  ]];
+  const body = rows.map((r) => [
+    r.category,
+    fmtCell(r.cost),
+    fmtCell(r.nbvOpen),
+    fmtCell(r.add),
+    fmtCell(r.disp),
+    fmtCell(r.depr),
+    fmtCell(r.nbvClose),
+  ]);
+  body.push([
+    "GESAMT",
+    fmtCell(g.cost),
+    fmtCell(g.nbvOpen),
+    fmtCell(g.add),
+    fmtCell(g.disp),
+    fmtCell(g.depr),
+    fmtCell(g.nbvClose),
+  ]);
+
+  autoTable(doc, {
+    head: HEAD,
+    body,
+    startY: 85,
+    margin: { left: 40, right: 40 },
+    styles: { fontSize: 10, cellPadding: 6, halign: "right" },
+    headStyles: { fillColor: [60, 60, 60], halign: "center", fontStyle: "bold" },
+    columnStyles: { 0: { halign: "left", fontStyle: "bold" } },
+    didParseCell: (data) => {
+      if (data.row.index === body.length - 1) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [220, 230, 245];
+      }
+    },
+  });
+
+  // Highlighted total depreciation box
+  // @ts-expect-error jspdf-autotable attaches lastAutoTable
+  const finalY: number = doc.lastAutoTable?.finalY ?? 200;
+  const boxY = finalY + 18;
+  doc.setFillColor(245, 247, 250);
+  doc.setDrawColor(180);
+  doc.roundedRect(40, boxY, pageW - 80, 36, 4, 4, "FD");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(`Gesamtabschreibung ${year}:`, 56, boxY + 23);
+  doc.setFontSize(13);
+  doc.text(fmtCell(g.depr), pageW - 56, boxY + 23, { align: "right" });
+
+  // Signature block at bottom
+  const sigY = pageH - 90;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("Ort, Datum: ____________________________", 40, sigY);
+
+  const colW = (pageW - 80) / 2;
+  const line1X = 40;
+  const line2X = 40 + colW;
+  const lineY = sigY + 50;
+  doc.line(line1X, lineY, line1X + colW - 30, lineY);
+  doc.line(line2X, lineY, line2X + colW - 30, lineY);
+  doc.setFontSize(9);
+  doc.text("Unterschrift — erstellt", line1X, lineY + 14);
+  doc.text("Unterschrift — genehmigt", line2X, lineY + 14);
+
+  doc.save(`anlagenspiegel-zusammenfassung-${year}.pdf`);
+}

@@ -8,7 +8,7 @@ import {
   MONTH_LABELS,
   type YearSchedule,
 } from "@/lib/depreciation";
-import { exportToExcel, exportToPDF } from "@/lib/export-schedule";
+import { exportToExcel, exportToPDF, exportSummaryPDF } from "@/lib/export-schedule";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -242,6 +242,15 @@ function SchedulePage() {
             disabled={schedules.length === 0}
           >
             <FileText className="h-4 w-4 mr-2" /> PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportSummaryPDF(groups, year)}
+            disabled={schedules.length === 0}
+            title="Einseitige Zusammenfassung A4 quer"
+          >
+            <FileText className="h-4 w-4 mr-2" /> Summary
           </Button>
           <Button
             variant="outline"
