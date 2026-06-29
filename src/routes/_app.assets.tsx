@@ -483,3 +483,62 @@ function ImportButton() {
     </>
   );
 }
+
+function BackupButton() {
+  const onClick = async () => {
+    try {
+      const json = await localAssets.exportJson();
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gastronoassets-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Backup downloaded");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return (
+    <Button variant="outline" onClick={onClick}>
+      <Download className="h-4 w-4 mr-2" /> Backup
+    </Button>
+  );
+}
+
+function RestoreButton() {
+  const qc = useQueryClient();
+  const onFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const mode = confirm(
+        "OK = REPLACE all existing data with the backup\nCancel = MERGE backup into current data",
+      )
+        ? "replace"
+        : "merge";
+      const n = await localAssets.importJson(text, mode);
+      await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
+      toast.success(`Restored ${n} assets (${mode})`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return (
+    <Button variant="outline" asChild>
+      <label className="cursor-pointer">
+        <FolderUp className="h-4 w-4 mr-2" /> Restore
+        <input
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) onFile(f);
+          }}
+        />
+      </label>
+    </Button>
+  );
+}
