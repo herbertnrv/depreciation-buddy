@@ -175,6 +175,15 @@ function SchedulePage() {
   const setCatDir = (val: "asc" | "desc") =>
     navigate({ search: (prev: Search) => ({ ...prev, catDir: val }) });
 
+  const setQ = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, q: val || undefined }) });
+  const setMinPrice = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, minPrice: val === "" ? undefined : Number(val) }) });
+  const setMaxPrice = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, maxPrice: val === "" ? undefined : Number(val) }) });
+  const clearFilters = () =>
+    navigate({ search: (prev: Search) => ({ ...prev, q: undefined, minPrice: undefined, maxPrice: undefined }) });
+
   const toggleSort = (key: SortKey) =>
     navigate({
       search: (prev: Search) => {
