@@ -80,9 +80,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "GastronoAssets — Hotel & Gastro Service" },
       { name: "description", content: "Offline fixed asset register with monthly straight-line depreciation and automatic year-end rollover." },
       { property: "og:title", content: "GastronoAssets — Hotel & Gastro Service" },
-      { property: "og:description", content: "Offline fixed asset register for hotels and gastronomy." },
+      { property: "og:description", content: "Offline fixed asset register with monthly straight-line depreciation and automatic year-end rollover." },
       { property: "og:type", content: "website" },
       { name: "theme-color", content: "#0b1b2b" },
+      { name: "twitter:title", content: "GastronoAssets — Hotel & Gastro Service" },
+      { name: "twitter:description", content: "Offline fixed asset register with monthly straight-line depreciation and automatic year-end rollover." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e06477b1-9f85-49c8-b5b3-fe1cd353a6c2/id-preview-d904fc9e--7f767fc6-0e9e-4a6f-8961-bdc2866d7bf2.lovable.app-1782719711712.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e06477b1-9f85-49c8-b5b3-fe1cd353a6c2/id-preview-d904fc9e--7f767fc6-0e9e-4a6f-8961-bdc2866d7bf2.lovable.app-1782719711712.png" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       {
