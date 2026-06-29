@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAssets } from "@/lib/use-assets";
 import {
   computeYearSchedule,
@@ -8,7 +8,19 @@ import {
   MONTH_LABELS,
   type YearSchedule,
 } from "@/lib/depreciation";
-import { exportToExcel, exportToPDF, exportSummaryPDF } from "@/lib/export-schedule";
+import {
+  exportToExcel,
+  exportToPDF,
+  exportSummaryPDF,
+  computeSummaryTotals,
+} from "@/lib/export-schedule";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Select,
