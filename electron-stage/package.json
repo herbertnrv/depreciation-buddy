@@ -1,9 +1,0 @@
-{
-  "name": "GastronoAssets",
-  "productName": "GastronoAssets",
-  "version": "1.0.0",
-  "description": "GastronoAssets — Hotel & Gastro Service (offline fixed asset register)",
-  "main": "electron/main.cjs",
-  "author": "GastronoAssets",
-  "license": "UNLICENSED"
-}
