@@ -66,6 +66,9 @@ const searchSchema = z.object({
   dir: z.enum(["asc", "desc"]).catch("asc"),
   category: z.string().optional().catch(undefined),
   catDir: z.enum(["asc", "desc"]).catch("asc"),
+  q: z.string().optional().catch(undefined),
+  minPrice: z.coerce.number().optional().catch(undefined),
+  maxPrice: z.coerce.number().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_app/schedule")({
