@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAssets } from "@/lib/use-assets";
 import {
   computeYearSchedule,
@@ -8,7 +8,19 @@ import {
   MONTH_LABELS,
   type YearSchedule,
 } from "@/lib/depreciation";
-import { exportToExcel, exportToPDF, exportSummaryPDF } from "@/lib/export-schedule";
+import {
+  exportToExcel,
+  exportToPDF,
+  exportSummaryPDF,
+  computeSummaryTotals,
+} from "@/lib/export-schedule";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -96,6 +108,7 @@ function SchedulePage() {
   const { year, sort, dir, category, catDir } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { data: assets, isLoading, error } = useAssets();
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const allSchedules = useMemo<YearSchedule[]>(() => {
     if (!assets) return [];
@@ -246,9 +259,9 @@ function SchedulePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportSummaryPDF(groups, year)}
+            onClick={() => setSummaryOpen(true)}
             disabled={schedules.length === 0}
-            title="Einseitige Zusammenfassung A4 quer"
+            title="One-page A4 landscape summary"
           >
             <FileText className="h-4 w-4 mr-2" /> Summary
           </Button>
@@ -355,7 +368,125 @@ function SchedulePage() {
           </table>
         </div>
       )}
+
+      <SummaryPreviewDialog
+        open={summaryOpen}
+        onOpenChange={setSummaryOpen}
+        groups={groups}
+        year={year}
+      />
     </div>
+  );
+}
+
+function SummaryPreviewDialog({
+  open,
+  onOpenChange,
+  groups,
+  year,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  groups: [string, YearSchedule[]][];
+  year: number;
+}) {
+  const { rows, total } = useMemo(() => computeSummaryTotals(groups), [groups]);
+  const company = "GastronoAssets — Hotel & Gastro Service";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Summary preview — A4 landscape</DialogTitle>
+        </DialogHeader>
+
+        {/* A4 landscape preview (842 x 595 pt), scaled to fit dialog */}
+        <div className="bg-white text-black border border-border rounded-md shadow-sm mx-auto"
+             style={{ width: "100%", aspectRatio: "842 / 595" }}>
+          <div className="h-full w-full p-6 flex flex-col">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-bold">Fixed Asset Register — Summary</h3>
+                <p className="text-xs text-gray-600 mt-1">Financial year {year}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-sm">{company}</p>
+                <p className="text-[10px] text-gray-600">As at 31.12.{year}</p>
+              </div>
+            </div>
+
+            <table className="w-full text-[11px] mt-4 border-collapse">
+              <thead>
+                <tr className="bg-neutral-700 text-white">
+                  <th className="text-left p-2 font-semibold">Category</th>
+                  <th className="text-right p-2 font-semibold">Cost (purchase)</th>
+                  <th className="text-right p-2 font-semibold">NBV 01.01.</th>
+                  <th className="text-right p-2 font-semibold">Additions</th>
+                  <th className="text-right p-2 font-semibold">Disposals</th>
+                  <th className="text-right p-2 font-semibold">Depreciation</th>
+                  <th className="text-right p-2 font-semibold">NBV 31.12.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.category} className="border-b border-neutral-200">
+                    <td className="p-2 font-semibold">{r.category}</td>
+                    <td className="text-right p-2 font-mono">{formatMoney(r.cost)}</td>
+                    <td className="text-right p-2 font-mono">{formatMoney(r.nbvOpen)}</td>
+                    <td className="text-right p-2 font-mono">{formatMoney(r.add)}</td>
+                    <td className="text-right p-2 font-mono">{formatMoney(r.disp)}</td>
+                    <td className="text-right p-2 font-mono">{formatMoney(r.depr)}</td>
+                    <td className="text-right p-2 font-mono">{formatMoney(r.nbvClose)}</td>
+                  </tr>
+                ))}
+                <tr className="bg-blue-50 font-bold">
+                  <td className="p-2">TOTAL</td>
+                  <td className="text-right p-2 font-mono">{formatMoney(total.cost)}</td>
+                  <td className="text-right p-2 font-mono">{formatMoney(total.nbvOpen)}</td>
+                  <td className="text-right p-2 font-mono">{formatMoney(total.add)}</td>
+                  <td className="text-right p-2 font-mono">{formatMoney(total.disp)}</td>
+                  <td className="text-right p-2 font-mono">{formatMoney(total.depr)}</td>
+                  <td className="text-right p-2 font-mono">{formatMoney(total.nbvClose)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div className="mt-3 border border-neutral-300 bg-neutral-50 rounded px-3 py-2 flex justify-between items-center">
+              <span className="font-bold text-sm">Total depreciation {year}:</span>
+              <span className="font-bold text-base font-mono">{formatMoney(total.depr)}</span>
+            </div>
+
+            <div className="flex-1" />
+
+            <div className="text-[11px]">
+              <p>Place, Date: ____________________________</p>
+              <div className="grid grid-cols-2 gap-8 mt-10">
+                <div>
+                  <div className="border-t border-black" />
+                  <p className="text-[10px] mt-1">Signature — prepared by</p>
+                </div>
+                <div>
+                  <div className="border-t border-black" />
+                  <p className="text-[10px] mt-1">Signature — approved by</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              exportSummaryPDF(groups, year);
+              onOpenChange(false);
+            }}
+          >
+            <FileText className="h-4 w-4 mr-2" /> Download PDF
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
