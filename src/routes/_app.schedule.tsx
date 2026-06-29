@@ -108,6 +108,7 @@ function SchedulePage() {
   const { year, sort, dir, category, catDir } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { data: assets, isLoading, error } = useAssets();
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const allSchedules = useMemo<YearSchedule[]>(() => {
     if (!assets) return [];
