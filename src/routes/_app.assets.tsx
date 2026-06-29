@@ -166,8 +166,9 @@ function AssetsPage() {
     mutationFn: async (id: string) => {
       await localAssets.remove(id);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY, refetchType: "all" });
+      await qc.refetchQueries({ queryKey: ASSETS_QUERY_KEY });
       toast.success("Asset removed");
     },
     onError: (e: Error) => toast.error(e.message),
