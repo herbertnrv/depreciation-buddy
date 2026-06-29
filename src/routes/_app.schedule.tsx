@@ -66,6 +66,9 @@ const searchSchema = z.object({
   dir: z.enum(["asc", "desc"]).catch("asc"),
   category: z.string().optional().catch(undefined),
   catDir: z.enum(["asc", "desc"]).catch("asc"),
+  q: z.string().optional().catch(undefined),
+  minPrice: z.coerce.number().optional().catch(undefined),
+  maxPrice: z.coerce.number().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/_app/schedule")({
@@ -107,7 +110,7 @@ function compare(a: YearSchedule, b: YearSchedule, key: SortKey, dir: SortDir): 
 }
 
 function SchedulePage() {
-  const { year, sort, dir, category, catDir } = Route.useSearch();
+  const { year, sort, dir, category, catDir, q, minPrice, maxPrice } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { data: assets, isLoading, error } = useAssets();
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -125,13 +128,19 @@ function SchedulePage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allSchedules]);
 
-  const schedules = useMemo<YearSchedule[]>(
-    () =>
-      category && category !== "__all__"
-        ? allSchedules.filter((s) => s.asset.category === category)
-        : allSchedules,
-    [allSchedules, category],
-  );
+  const schedules = useMemo<YearSchedule[]>(() => {
+    const qNorm = (q ?? "").trim().toLowerCase();
+    return allSchedules.filter((s) => {
+      if (category && category !== "__all__" && s.asset.category !== category) return false;
+      if (qNorm) {
+        const hay = `${s.asset.description ?? ""} ${s.asset.asset_number ?? ""} ${s.asset.location ?? ""}`.toLowerCase();
+        if (!hay.includes(qNorm)) return false;
+      }
+      if (typeof minPrice === "number" && !isNaN(minPrice) && s.asset.purchase_price < minPrice) return false;
+      if (typeof maxPrice === "number" && !isNaN(maxPrice) && s.asset.purchase_price > maxPrice) return false;
+      return true;
+    });
+  }, [allSchedules, category, q, minPrice, maxPrice]);
 
   const groups = useMemo<[string, YearSchedule[]][]>(() => {
     const map = new Map<string, YearSchedule[]>();
@@ -165,6 +174,15 @@ function SchedulePage() {
 
   const setCatDir = (val: "asc" | "desc") =>
     navigate({ search: (prev: Search) => ({ ...prev, catDir: val }) });
+
+  const setQ = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, q: val || undefined }) });
+  const setMinPrice = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, minPrice: val === "" ? undefined : Number(val) }) });
+  const setMaxPrice = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, maxPrice: val === "" ? undefined : Number(val) }) });
+  const clearFilters = () =>
+    navigate({ search: (prev: Search) => ({ ...prev, q: undefined, minPrice: undefined, maxPrice: undefined }) });
 
   const toggleSort = (key: SortKey) =>
     navigate({
@@ -289,8 +307,47 @@ function SchedulePage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-card/50 p-3">
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Search description / inv# / location</Label>
+          <Input
+            className="w-[280px] h-9"
+            placeholder="e.g. fridge, INV-001, kitchen"
+            value={q ?? ""}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Min purchase price</Label>
+          <Input
+            type="number"
+            className="w-[140px] h-9"
+            placeholder="0"
+            value={minPrice ?? ""}
+            onChange={(e) => setMinPrice(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Max purchase price</Label>
+          <Input
+            type="number"
+            className="w-[140px] h-9"
+            placeholder="∞"
+            value={maxPrice ?? ""}
+            onChange={(e) => setMaxPrice(e.target.value)}
+          />
+        </div>
+        {(q || minPrice !== undefined || maxPrice !== undefined) && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
+        )}
+        <div className="ml-auto text-xs text-muted-foreground">
+          {schedules.length} of {allSchedules.length} assets
+        </div>
+      </div>
+
       {isLoading && <p className="text-muted-foreground">Loading…</p>}
       {error && <p className="text-destructive">Failed to load assets.</p>}
+
 
       {!isLoading && schedules.length === 0 && (
         <div className="rounded-lg border border-dashed border-border p-12 text-center">
