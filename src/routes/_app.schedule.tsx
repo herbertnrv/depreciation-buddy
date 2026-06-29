@@ -110,7 +110,7 @@ function compare(a: YearSchedule, b: YearSchedule, key: SortKey, dir: SortDir): 
 }
 
 function SchedulePage() {
-  const { year, sort, dir, category, catDir } = Route.useSearch();
+  const { year, sort, dir, category, catDir, q, minPrice, maxPrice } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { data: assets, isLoading, error } = useAssets();
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -128,13 +128,19 @@ function SchedulePage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allSchedules]);
 
-  const schedules = useMemo<YearSchedule[]>(
-    () =>
-      category && category !== "__all__"
-        ? allSchedules.filter((s) => s.asset.category === category)
-        : allSchedules,
-    [allSchedules, category],
-  );
+  const schedules = useMemo<YearSchedule[]>(() => {
+    const qNorm = (q ?? "").trim().toLowerCase();
+    return allSchedules.filter((s) => {
+      if (category && category !== "__all__" && s.asset.category !== category) return false;
+      if (qNorm) {
+        const hay = `${s.asset.description ?? ""} ${s.asset.asset_number ?? ""} ${s.asset.location ?? ""}`.toLowerCase();
+        if (!hay.includes(qNorm)) return false;
+      }
+      if (typeof minPrice === "number" && !isNaN(minPrice) && s.asset.purchase_price < minPrice) return false;
+      if (typeof maxPrice === "number" && !isNaN(maxPrice) && s.asset.purchase_price > maxPrice) return false;
+      return true;
+    });
+  }, [allSchedules, category, q, minPrice, maxPrice]);
 
   const groups = useMemo<[string, YearSchedule[]][]>(() => {
     const map = new Map<string, YearSchedule[]>();
