@@ -207,9 +207,9 @@ function SchedulePage() {
   }) => {
     const active = sort === k;
     const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
-    return (
-      <th className={`p-0 font-medium ${className}`}>
-        <button
+  return (
+    <th className={`p-0 font-medium sticky top-0 bg-muted/50 ${className}`}>
+      <button
           type="button"
           onClick={() => toggleSort(k)}
           className={`w-full h-full px-2 py-2 flex items-center gap-1 hover:text-foreground transition-colors ${
