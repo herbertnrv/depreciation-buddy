@@ -367,6 +367,63 @@ function Field({
   );
 }
 
+function CategoryField({
+  value,
+  onChange,
+  existing,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  existing: string[];
+}) {
+  const NEW = "__new__";
+  const isExisting = existing.includes(value);
+  const [mode, setMode] = useState<"select" | "new">(
+    existing.length === 0 || (!isExisting && value !== "") ? "new" : "select"
+  );
+
+  return (
+    <div>
+      <Label className="mb-2 block">Category</Label>
+      {mode === "select" && existing.length > 0 ? (
+        <Select
+          value={isExisting ? value : ""}
+          onValueChange={(v) => {
+            if (v === NEW) {
+              setMode("new");
+              onChange("");
+            } else {
+              onChange(v);
+            }
+          }}
+        >
+          <SelectTrigger><SelectValue placeholder="Select category…" /></SelectTrigger>
+          <SelectContent>
+            {existing.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+            <SelectItem value={NEW}>+ New category…</SelectItem>
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="flex gap-2">
+          <Input
+            value={value}
+            placeholder="New category name"
+            onChange={(e) => onChange(e.target.value)}
+            autoFocus
+          />
+          {existing.length > 0 && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setMode("select")}>
+              ↩
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ImportButton() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
