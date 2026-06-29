@@ -29,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   ArrowDown,
   ArrowUp,
@@ -392,6 +394,10 @@ function SummaryPreviewDialog({
 }) {
   const { rows, total } = useMemo(() => computeSummaryTotals(groups), [groups]);
   const company = "GastronoAssets — Hotel & Gastro Service";
+  const [place, setPlace] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [preparedBy, setPreparedBy] = useState("");
+  const [approvedBy, setApprovedBy] = useState("");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -459,13 +465,22 @@ function SummaryPreviewDialog({
             <div className="flex-1" />
 
             <div className="text-[11px]">
-              <p>Place, Date: ____________________________</p>
+              <p>
+                Place, Date:{" "}
+                <span className="font-medium">
+                  {place || "____________"}
+                  {(place || date) && ", "}
+                  {date || "____________"}
+                </span>
+              </p>
               <div className="grid grid-cols-2 gap-8 mt-10">
                 <div>
+                  <p className="text-[11px] mb-1 h-4">{preparedBy}</p>
                   <div className="border-t border-black" />
                   <p className="text-[10px] mt-1">Signature — prepared by</p>
                 </div>
                 <div>
+                  <p className="text-[11px] mb-1 h-4">{approvedBy}</p>
                   <div className="border-t border-black" />
                   <p className="text-[10px] mt-1">Signature — approved by</p>
                 </div>
@@ -474,11 +489,30 @@ function SummaryPreviewDialog({
           </div>
         </div>
 
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          <div className="space-y-1">
+            <Label htmlFor="sum-place">Place</Label>
+            <Input id="sum-place" value={place} onChange={(e) => setPlace(e.target.value)} placeholder="e.g. Berlin" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="sum-date">Date</Label>
+            <Input id="sum-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="sum-prep">Prepared by</Label>
+            <Input id="sum-prep" value={preparedBy} onChange={(e) => setPreparedBy(e.target.value)} placeholder="Name" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="sum-app">Approved by</Label>
+            <Input id="sum-app" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Name" />
+          </div>
+        </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             onClick={() => {
-              exportSummaryPDF(groups, year);
+              exportSummaryPDF(groups, year, { place, date, preparedBy, approvedBy });
               onOpenChange(false);
             }}
           >
