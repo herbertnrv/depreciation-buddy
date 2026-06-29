@@ -307,8 +307,47 @@ function SchedulePage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-card/50 p-3">
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Search description / inv# / location</Label>
+          <Input
+            className="w-[280px] h-9"
+            placeholder="e.g. fridge, INV-001, kitchen"
+            value={q ?? ""}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Min purchase price</Label>
+          <Input
+            type="number"
+            className="w-[140px] h-9"
+            placeholder="0"
+            value={minPrice ?? ""}
+            onChange={(e) => setMinPrice(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Max purchase price</Label>
+          <Input
+            type="number"
+            className="w-[140px] h-9"
+            placeholder="∞"
+            value={maxPrice ?? ""}
+            onChange={(e) => setMaxPrice(e.target.value)}
+          />
+        </div>
+        {(q || minPrice !== undefined || maxPrice !== undefined) && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
+        )}
+        <div className="ml-auto text-xs text-muted-foreground">
+          {schedules.length} of {allSchedules.length} assets
+        </div>
+      </div>
+
       {isLoading && <p className="text-muted-foreground">Loading…</p>}
       {error && <p className="text-destructive">Failed to load assets.</p>}
+
 
       {!isLoading && schedules.length === 0 && (
         <div className="rounded-lg border border-dashed border-border p-12 text-center">
