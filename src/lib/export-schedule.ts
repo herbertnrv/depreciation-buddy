@@ -220,7 +220,7 @@ export function exportSummaryPDF(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(
-    `Stand: 31.12.${year}`,
+    `As at 31.12.${year}`,
     pageW - 40,
     55,
     { align: "right" },
@@ -229,10 +229,10 @@ export function exportSummaryPDF(
   // Title left
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("Anlagenspiegel — Zusammenfassung", 40, 45);
+  doc.text("Fixed Asset Register — Summary", 40, 45);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`Buchungsjahr ${year}`, 40, 62);
+  doc.text(`Financial year ${year}`, 40, 62);
 
   // Build category totals
   type Tot = {
@@ -246,7 +246,7 @@ export function exportSummaryPDF(
   };
   const rows: Tot[] = [];
   const g: Tot = {
-    category: "Gesamt",
+    category: "Total",
     cost: 0, nbvOpen: 0, add: 0, disp: 0, depr: 0, nbvClose: 0,
   };
   for (const [category, schedules] of groups) {
@@ -269,13 +269,13 @@ export function exportSummaryPDF(
   }
 
   const HEAD = [[
-    "Kategorie",
-    "Anschaffungspreis",
-    "Buchwert 01.01.",
-    "Zugang",
-    "Abgang",
-    "Abschreibung",
-    "Buchwert 31.12.",
+    "Category",
+    "Cost (purchase)",
+    "NBV 01.01.",
+    "Additions",
+    "Disposals",
+    "Depreciation",
+    "NBV 31.12.",
   ]];
   const body = rows.map((r) => [
     r.category,
@@ -287,7 +287,7 @@ export function exportSummaryPDF(
     fmtCell(r.nbvClose),
   ]);
   body.push([
-    "GESAMT",
+    "TOTAL",
     fmtCell(g.cost),
     fmtCell(g.nbvOpen),
     fmtCell(g.add),
@@ -321,7 +321,7 @@ export function exportSummaryPDF(
   doc.roundedRect(40, boxY, pageW - 80, 36, 4, 4, "FD");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(`Gesamtabschreibung ${year}:`, 56, boxY + 23);
+  doc.text(`Total depreciation ${year}:`, 56, boxY + 23);
   doc.setFontSize(13);
   doc.text(fmtCell(g.depr), pageW - 56, boxY + 23, { align: "right" });
 
