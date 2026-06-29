@@ -204,11 +204,24 @@ function fmtCell(n: number): string {
   }).format(n);
 }
 
+export type SummaryPDFOptions = {
+  companyName?: string;
+  place?: string;
+  date?: string;
+  preparedBy?: string;
+  approvedBy?: string;
+};
+
 export function exportSummaryPDF(
   groups: [string, YearSchedule[]][],
   year: number,
-  companyName = "GastronoAssets — Hotel & Gastro Service",
+  options: SummaryPDFOptions = {},
 ) {
+  const companyName = options.companyName ?? "GastronoAssets — Hotel & Gastro Service";
+  const place = options.place ?? "";
+  const dateStr = options.date ?? "";
+  const preparedBy = options.preparedBy ?? "";
+  const approvedBy = options.approvedBy ?? "";
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
