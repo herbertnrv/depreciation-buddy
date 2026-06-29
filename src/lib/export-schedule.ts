@@ -351,6 +351,30 @@ export function exportSummaryPDF(
   doc.line(line1X, lineY, line1X + colW - 30, lineY);
   doc.line(line2X, lineY, line2X + colW - 30, lineY);
   doc.setFontSize(9);
+  // Signature block at bottom
+  const sigY = pageH - 90;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const placeDateText = place || dateStr
+    ? `Place, Date: ${place}${place && dateStr ? ", " : ""}${dateStr}`
+    : "Place, Date: ____________________________";
+  doc.text(placeDateText, 40, sigY);
+
+  const colW = (pageW - 80) / 2;
+  const line1X = 40;
+  const line2X = 40 + colW;
+  const lineY = sigY + 50;
+  doc.line(line1X, lineY, line1X + colW - 30, lineY);
+  doc.line(line2X, lineY, line2X + colW - 30, lineY);
+  if (preparedBy) {
+    doc.setFontSize(10);
+    doc.text(preparedBy, line1X, lineY - 4);
+  }
+  if (approvedBy) {
+    doc.setFontSize(10);
+    doc.text(approvedBy, line2X, lineY - 4);
+  }
+  doc.setFontSize(9);
   doc.text("Signature — prepared by", line1X, lineY + 14);
   doc.text("Signature — approved by", line2X, lineY + 14);
 
