@@ -55,7 +55,7 @@ export const localAssets = {
     return rows;
   },
 
-  async insert(items: NewAsset | NewAsset[]): Promise<void> {
+  async insert(items: NewAsset | NewAsset[]): Promise<string> {
     const arr = Array.isArray(items) ? items : [items];
     const ts = nowIso();
     const records: AssetRecord[] = arr.map((a) => ({
@@ -65,6 +65,7 @@ export const localAssets = {
       updated_at: ts,
     }));
     await db().fixed_assets.bulkAdd(records);
+    return records[0]?.id ?? "";
   },
 
   async update(id: string, patch: Partial<NewAsset>): Promise<void> {
