@@ -11,25 +11,38 @@ import {
 import { exportToExcel, exportToPDF } from "@/lib/export-schedule";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
   FileText,
 } from "lucide-react";
 
-type SortKey = "asset_number" | "location" | "purchase_date";
+const SORT_KEYS = [
+  "asset_number",
+  "description",
+  "location",
+  "purchase_date",
+  "openingCost",
+  "additions",
+  "disposals",
+  "closingCost",
+  "rate",
+  "monthly",
+  "m1","m2","m3","m4","m5","m6","m7","m8","m9","m10","m11","m12",
+  "yearDepreciation",
+  "closingAccumulated",
+  "openingNBV",
+  "closingNBV",
+] as const;
+type SortKey = (typeof SORT_KEYS)[number];
 type SortDir = "asc" | "desc";
 
 const searchSchema = z.object({
   year: z.coerce.number().int().min(1990).max(2100).catch(new Date().getFullYear()),
-  sort: z.enum(["asset_number", "location", "purchase_date"]).catch("purchase_date"),
+  sort: z.enum(SORT_KEYS).catch("purchase_date"),
   dir: z.enum(["asc", "desc"]).catch("asc"),
 });
 
@@ -38,10 +51,37 @@ export const Route = createFileRoute("/_app/schedule")({
   component: SchedulePage,
 });
 
-function cmp(a: string | null, b: string | null, dir: SortDir) {
-  const av = a ?? "";
-  const bv = b ?? "";
-  const r = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+function valueFor(s: YearSchedule, key: SortKey): string | number {
+  switch (key) {
+    case "asset_number": return s.asset.asset_number ?? "";
+    case "description": return s.asset.description ?? "";
+    case "location": return s.asset.location ?? "";
+    case "purchase_date": return s.asset.purchase_date ?? "";
+    case "openingCost": return s.openingCost;
+    case "additions": return s.additions;
+    case "disposals": return s.disposals;
+    case "closingCost": return s.closingCost;
+    case "rate": return s.asset.rate_per_year;
+    case "monthly": return s.monthlyDepreciation;
+    case "yearDepreciation": return s.yearDepreciation;
+    case "closingAccumulated": return s.closingAccumulated;
+    case "openingNBV": return s.openingNBV;
+    case "closingNBV": return s.closingNBV;
+    default:
+      if (key.startsWith("m")) {
+        const idx = Number(key.slice(1)) - 1;
+        return s.months[idx] ?? 0;
+      }
+      return "";
+  }
+}
+
+function compare(a: YearSchedule, b: YearSchedule, key: SortKey, dir: SortDir): number {
+  const av = valueFor(a, key);
+  const bv = valueFor(b, key);
+  let r: number;
+  if (typeof av === "number" && typeof bv === "number") r = av - bv;
+  else r = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: "base" });
   return dir === "asc" ? r : -r;
 }
 
@@ -66,11 +106,7 @@ function SchedulePage() {
     }
     const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
     for (const [, rows] of sorted) {
-      rows.sort((a, b) => {
-        const av = (a.asset as Record<string, unknown>)[sort];
-        const bv = (b.asset as Record<string, unknown>)[sort];
-        return cmp(av == null ? "" : String(av), bv == null ? "" : String(bv), dir);
-      });
+      rows.sort((a, b) => compare(a, b, sort, dir));
     }
     return sorted;
   }, [schedules, sort, dir]);
@@ -86,11 +122,46 @@ function SchedulePage() {
   const setYear = (delta: number) =>
     navigate({ search: (prev: Search) => ({ ...prev, year: prev.year + delta }) });
 
-  const setSort = (s: SortKey) =>
-    navigate({ search: (prev: Search) => ({ ...prev, sort: s }) });
+  const toggleSort = (key: SortKey) =>
+    navigate({
+      search: (prev: Search) => {
+        if (prev.sort === key) {
+          return { ...prev, dir: prev.dir === "asc" ? "desc" : "asc" };
+        }
+        return { ...prev, sort: key, dir: "asc" };
+      },
+    });
 
-  const setDir = (d: SortDir) =>
-    navigate({ search: (prev: Search) => ({ ...prev, dir: d }) });
+  const SortHead = ({
+    k,
+    children,
+    align = "left",
+    className = "",
+  }: {
+    k: SortKey;
+    children: React.ReactNode;
+    align?: "left" | "right";
+    className?: string;
+  }) => {
+    const active = sort === k;
+    const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+    return (
+      <th className={`p-0 font-medium ${className}`}>
+        <button
+          type="button"
+          onClick={() => toggleSort(k)}
+          className={`w-full h-full px-2 py-2 flex items-center gap-1 hover:text-foreground transition-colors ${
+            align === "right" ? "justify-end" : "justify-start"
+          } ${active ? "text-foreground" : ""}`}
+          title={`Sort by ${String(children)}`}
+        >
+          {align === "right" && <Icon className={`h-3 w-3 ${active ? "" : "opacity-40"}`} />}
+          <span>{children}</span>
+          {align === "left" && <Icon className={`h-3 w-3 ${active ? "" : "opacity-40"}`} />}
+        </button>
+      </th>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -100,32 +171,10 @@ function SchedulePage() {
             Depreciation Schedule — {year}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Opening balances roll forward automatically from {year - 1}.
+            Click any column header to sort. Exports follow the current sort order.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Sort by</span>
-            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="w-[160px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asset_number">Inventory #</SelectItem>
-                <SelectItem value="location">Location</SelectItem>
-                <SelectItem value="purchase_date">Purchase date</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={dir} onValueChange={(v) => setDir(v as SortDir)}>
-              <SelectTrigger className="w-[130px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">Ascending</SelectItem>
-                <SelectItem value="desc">Descending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <Button
             variant="outline"
             size="sm"
@@ -141,6 +190,14 @@ function SchedulePage() {
             disabled={schedules.length === 0}
           >
             <FileText className="h-4 w-4 mr-2" /> PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            disabled={schedules.length === 0}
+          >
+            Print
           </Button>
           <div className="flex items-center gap-2 ml-2">
             <Button variant="outline" size="icon" onClick={() => setYear(-1)} aria-label="Previous year">
@@ -173,23 +230,23 @@ function SchedulePage() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="text-left p-2 font-medium sticky left-0 bg-muted/50 z-10 min-w-[80px]">Inv #</th>
-                <th className="text-left p-2 font-medium min-w-[180px]">Description</th>
-                <th className="text-left p-2 font-medium">Location</th>
-                <th className="text-left p-2 font-medium">Purchased</th>
-                <th className="text-right p-2 font-medium">Cost 01.01</th>
-                <th className="text-right p-2 font-medium text-emerald-600 dark:text-emerald-400">Additions</th>
-                <th className="text-right p-2 font-medium text-red-600 dark:text-red-400">Disposals</th>
-                <th className="text-right p-2 font-medium">Cost 31.12</th>
-                <th className="text-right p-2 font-medium">Rate</th>
-                <th className="text-right p-2 font-medium">Monthly</th>
-                {MONTH_LABELS.map((m) => (
-                  <th key={m} className="text-right p-2 font-medium">{m}</th>
+                <SortHead k="asset_number" className="sticky left-0 bg-muted/50 z-10 min-w-[80px]">Inv #</SortHead>
+                <SortHead k="description" className="min-w-[180px]">Description</SortHead>
+                <SortHead k="location">Location</SortHead>
+                <SortHead k="purchase_date">Purchased</SortHead>
+                <SortHead k="openingCost" align="right">Cost 01.01</SortHead>
+                <SortHead k="additions" align="right" className="text-emerald-600 dark:text-emerald-400">Additions</SortHead>
+                <SortHead k="disposals" align="right" className="text-red-600 dark:text-red-400">Disposals</SortHead>
+                <SortHead k="closingCost" align="right">Cost 31.12</SortHead>
+                <SortHead k="rate" align="right">Rate</SortHead>
+                <SortHead k="monthly" align="right">Monthly</SortHead>
+                {MONTH_LABELS.map((m, i) => (
+                  <SortHead key={m} k={`m${i + 1}` as SortKey} align="right">{m}</SortHead>
                 ))}
-                <th className="text-right p-2 font-medium border-l border-border">Year Depr.</th>
-                <th className="text-right p-2 font-medium">Acc. Depr. 31.12</th>
-                <th className="text-right p-2 font-medium border-l border-border">NBV 01.01</th>
-                <th className="text-right p-2 font-medium font-semibold">NBV 31.12</th>
+                <SortHead k="yearDepreciation" align="right" className="border-l border-border">Year Depr.</SortHead>
+                <SortHead k="closingAccumulated" align="right">Acc. Depr. 31.12</SortHead>
+                <SortHead k="openingNBV" align="right" className="border-l border-border">NBV 01.01</SortHead>
+                <SortHead k="closingNBV" align="right">NBV 31.12</SortHead>
               </tr>
             </thead>
             <tbody>
