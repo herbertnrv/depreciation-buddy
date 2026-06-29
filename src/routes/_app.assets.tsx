@@ -135,13 +135,26 @@ function AssetsPage() {
       };
       if (editing) {
         await localAssets.update(editing.id, payload);
-      } else {
-        await localAssets.insert(payload);
+        return { id: editing.id, ...payload };
       }
+      const id = await localAssets.insert(payload);
+      return { id, ...payload };
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
-      toast.success(editing ? "Asset updated" : "Asset added");
+    onSuccess: async (saved) => {
+      // Force a full refetch so the depreciation schedule recomputes
+      // immediately for the newly added / edited asset, even on tabs
+      // that are not currently mounted.
+      await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY, refetchType: "all" });
+      await qc.refetchQueries({ queryKey: ASSETS_QUERY_KEY });
+      const months = Math.round(12 / Math.max(saved.rate_per_year || 0, 0.0001));
+      const monthly = (saved.purchase_price * saved.rate_per_year) / 12;
+      toast.success(
+        editing
+          ? "Asset updated — depreciation recalculated"
+          : saved.rate_per_year > 0
+            ? `Asset added — monthly depreciation ${monthly.toFixed(2)} over ${months} months`
+            : "Asset added — no depreciation (rate 0%)",
+      );
       setOpen(false);
       setEditing(null);
       setForm(blank);
@@ -153,8 +166,9 @@ function AssetsPage() {
     mutationFn: async (id: string) => {
       await localAssets.remove(id);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY, refetchType: "all" });
+      await qc.refetchQueries({ queryKey: ASSETS_QUERY_KEY });
       toast.success("Asset removed");
     },
     onError: (e: Error) => toast.error(e.message),
