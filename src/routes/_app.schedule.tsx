@@ -11,6 +11,13 @@ import {
 import { exportToExcel, exportToPDF } from "@/lib/export-schedule";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -44,6 +51,8 @@ const searchSchema = z.object({
   year: z.coerce.number().int().min(1990).max(2100).catch(new Date().getFullYear()),
   sort: z.enum(SORT_KEYS).catch("purchase_date"),
   dir: z.enum(["asc", "desc"]).catch("asc"),
+  category: z.string().optional().catch(undefined),
+  catDir: z.enum(["asc", "desc"]).catch("asc"),
 });
 
 export const Route = createFileRoute("/_app/schedule")({
@@ -86,16 +95,30 @@ function compare(a: YearSchedule, b: YearSchedule, key: SortKey, dir: SortDir): 
 }
 
 function SchedulePage() {
-  const { year, sort, dir } = Route.useSearch();
+  const { year, sort, dir, category, catDir } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { data: assets, isLoading, error } = useAssets();
 
-  const schedules = useMemo<YearSchedule[]>(() => {
+  const allSchedules = useMemo<YearSchedule[]>(() => {
     if (!assets) return [];
     return assets
       .map((a) => computeYearSchedule(a, year))
       .filter((s) => s.openingCost > 0 || s.additions > 0 || s.disposals > 0);
   }, [assets, year]);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of allSchedules) set.add(s.asset.category);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allSchedules]);
+
+  const schedules = useMemo<YearSchedule[]>(
+    () =>
+      category && category !== "__all__"
+        ? allSchedules.filter((s) => s.asset.category === category)
+        : allSchedules,
+    [allSchedules, category],
+  );
 
   const groups = useMemo<[string, YearSchedule[]][]>(() => {
     const map = new Map<string, YearSchedule[]>();
@@ -104,12 +127,14 @@ function SchedulePage() {
       arr.push(s);
       map.set(s.asset.category, arr);
     }
-    const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const sorted = Array.from(map.entries()).sort(([a], [b]) =>
+      catDir === "asc" ? a.localeCompare(b) : b.localeCompare(a),
+    );
     for (const [, rows] of sorted) {
       rows.sort((a, b) => compare(a, b, sort, dir));
     }
     return sorted;
-  }, [schedules, sort, dir]);
+  }, [schedules, sort, dir, catDir]);
 
   const totals = useMemo(() => totalsOf(schedules), [schedules]);
   const monthlyTotals = useMemo(() => {
@@ -121,6 +146,12 @@ function SchedulePage() {
   type Search = z.infer<typeof searchSchema>;
   const setYear = (delta: number) =>
     navigate({ search: (prev: Search) => ({ ...prev, year: prev.year + delta }) });
+
+  const setCategory = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, category: val === "__all__" ? undefined : val }) });
+
+  const setCatDir = (val: "asc" | "desc") =>
+    navigate({ search: (prev: Search) => ({ ...prev, catDir: val }) });
 
   const toggleSort = (key: SortKey) =>
     navigate({
@@ -175,6 +206,29 @@ function SchedulePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Category</span>
+            <Select value={category ?? "__all__"} onValueChange={setCategory}>
+              <SelectTrigger className="w-[200px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All categories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={catDir} onValueChange={(v) => setCatDir(v as "asc" | "desc")}>
+              <SelectTrigger className="w-[120px] h-9" title="Category order">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">A → Z</SelectItem>
+                <SelectItem value="desc">Z → A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="outline"
             size="sm"
