@@ -11,6 +11,13 @@ import {
 import { exportToExcel, exportToPDF } from "@/lib/export-schedule";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
