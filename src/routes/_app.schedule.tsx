@@ -95,16 +95,30 @@ function compare(a: YearSchedule, b: YearSchedule, key: SortKey, dir: SortDir): 
 }
 
 function SchedulePage() {
-  const { year, sort, dir } = Route.useSearch();
+  const { year, sort, dir, category, catDir } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { data: assets, isLoading, error } = useAssets();
 
-  const schedules = useMemo<YearSchedule[]>(() => {
+  const allSchedules = useMemo<YearSchedule[]>(() => {
     if (!assets) return [];
     return assets
       .map((a) => computeYearSchedule(a, year))
       .filter((s) => s.openingCost > 0 || s.additions > 0 || s.disposals > 0);
   }, [assets, year]);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of allSchedules) set.add(s.asset.category);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allSchedules]);
+
+  const schedules = useMemo<YearSchedule[]>(
+    () =>
+      category && category !== "__all__"
+        ? allSchedules.filter((s) => s.asset.category === category)
+        : allSchedules,
+    [allSchedules, category],
+  );
 
   const groups = useMemo<[string, YearSchedule[]][]>(() => {
     const map = new Map<string, YearSchedule[]>();
@@ -113,12 +127,14 @@ function SchedulePage() {
       arr.push(s);
       map.set(s.asset.category, arr);
     }
-    const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const sorted = Array.from(map.entries()).sort(([a], [b]) =>
+      catDir === "asc" ? a.localeCompare(b) : b.localeCompare(a),
+    );
     for (const [, rows] of sorted) {
       rows.sort((a, b) => compare(a, b, sort, dir));
     }
     return sorted;
-  }, [schedules, sort, dir]);
+  }, [schedules, sort, dir, catDir]);
 
   const totals = useMemo(() => totalsOf(schedules), [schedules]);
   const monthlyTotals = useMemo(() => {
@@ -130,6 +146,12 @@ function SchedulePage() {
   type Search = z.infer<typeof searchSchema>;
   const setYear = (delta: number) =>
     navigate({ search: (prev: Search) => ({ ...prev, year: prev.year + delta }) });
+
+  const setCategory = (val: string) =>
+    navigate({ search: (prev: Search) => ({ ...prev, category: val === "__all__" ? undefined : val }) });
+
+  const setCatDir = (val: "asc" | "desc") =>
+    navigate({ search: (prev: Search) => ({ ...prev, catDir: val }) });
 
   const toggleSort = (key: SortKey) =>
     navigate({
