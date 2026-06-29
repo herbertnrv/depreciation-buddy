@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { localAssets } from "@/lib/local-db";
 import { ASSETS_QUERY_KEY, useAssets } from "@/lib/use-assets";
 import type { AssetInput } from "@/lib/depreciation";
 import { formatMoney } from "@/lib/depreciation";
@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Upload, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, AlertCircle, Download, FolderUp } from "lucide-react";
 import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -131,11 +131,9 @@ function AssetsPage() {
         notes: form.notes || null,
       };
       if (editing) {
-        const { error } = await supabase.from("fixed_assets").update(payload).eq("id", editing.id);
-        if (error) throw error;
+        await localAssets.update(editing.id, payload);
       } else {
-        const { error } = await supabase.from("fixed_assets").insert(payload);
-        if (error) throw error;
+        await localAssets.insert(payload);
       }
     },
     onSuccess: () => {
@@ -150,8 +148,7 @@ function AssetsPage() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("fixed_assets").delete().eq("id", id);
-      if (error) throw error;
+      await localAssets.remove(id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
@@ -210,6 +207,8 @@ function AssetsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <BackupButton />
+          <RestoreButton />
           <ImportButton />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -392,21 +391,18 @@ function ImportButton() {
     if (parsed.length === 0) return;
     setBusy(true);
     try {
-      // Insert in chunks to stay well under request limits.
-      const chunkSize = 200;
-      for (let i = 0; i < parsed.length; i += chunkSize) {
-        const chunk = parsed.slice(i, i + chunkSize).map((a) => ({
-          asset_number: a.asset_number,
-          category: a.category,
-          description: a.description,
-          location: a.location,
-          purchase_date: a.purchase_date,
-          purchase_price: a.purchase_price,
-          rate_per_year: a.rate_per_year,
-        }));
-        const { error } = await supabase.from("fixed_assets").insert(chunk);
-        if (error) throw error;
-      }
+      const records = parsed.map((a) => ({
+        asset_number: a.asset_number,
+        category: a.category,
+        description: a.description,
+        location: a.location,
+        purchase_date: a.purchase_date,
+        purchase_price: a.purchase_price,
+        rate_per_year: a.rate_per_year,
+        disposal_date: null,
+        notes: null,
+      }));
+      await localAssets.insert(records);
       await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
       toast.success(`Imported ${parsed.length} assets`);
       setOpen(false);
@@ -485,5 +481,64 @@ function ImportButton() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function BackupButton() {
+  const onClick = async () => {
+    try {
+      const json = await localAssets.exportJson();
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gastronoassets-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Backup downloaded");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return (
+    <Button variant="outline" onClick={onClick}>
+      <Download className="h-4 w-4 mr-2" /> Backup
+    </Button>
+  );
+}
+
+function RestoreButton() {
+  const qc = useQueryClient();
+  const onFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const mode = confirm(
+        "OK = REPLACE all existing data with the backup\nCancel = MERGE backup into current data",
+      )
+        ? "replace"
+        : "merge";
+      const n = await localAssets.importJson(text, mode);
+      await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
+      toast.success(`Restored ${n} assets (${mode})`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+  return (
+    <Button variant="outline" asChild>
+      <label className="cursor-pointer">
+        <FolderUp className="h-4 w-4 mr-2" /> Restore
+        <input
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) onFile(f);
+          }}
+        />
+      </label>
+    </Button>
   );
 }
