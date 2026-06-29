@@ -31,6 +31,9 @@ import { toast } from "sonner";
 
 function validateForm(form: FormState): string[] {
   const errs: string[] = [];
+  if (!form.category || !form.category.trim()) {
+    errs.push("Category is required — pick an existing one or enter a new name.");
+  }
   const price = Number(form.purchase_price);
   if (!form.purchase_price || isNaN(price) || price <= 0) {
     errs.push("Purchase price must be greater than 0. Enter a positive number (e.g. 1500).");
