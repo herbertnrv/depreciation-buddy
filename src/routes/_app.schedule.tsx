@@ -32,17 +32,16 @@ const SORT_KEYS = [
   "description",
   "location",
   "purchase_date",
-  "openingCost",
+  "costPurchase",
+  "openingNBV",
   "additions",
   "disposals",
-  "closingCost",
+  "yearDepreciation",
+  "closingNBV",
   "rate",
   "monthly",
   "m1","m2","m3","m4","m5","m6","m7","m8","m9","m10","m11","m12",
-  "yearDepreciation",
   "closingAccumulated",
-  "openingNBV",
-  "closingNBV",
 ] as const;
 type SortKey = (typeof SORT_KEYS)[number];
 type SortDir = "asc" | "desc";
@@ -66,16 +65,15 @@ function valueFor(s: YearSchedule, key: SortKey): string | number {
     case "description": return s.asset.description ?? "";
     case "location": return s.asset.location ?? "";
     case "purchase_date": return s.asset.purchase_date ?? "";
-    case "openingCost": return s.openingCost;
+    case "costPurchase": return s.asset.purchase_price;
+    case "openingNBV": return s.openingNBV;
     case "additions": return s.additions;
     case "disposals": return s.disposals;
-    case "closingCost": return s.closingCost;
+    case "yearDepreciation": return s.yearDepreciation;
+    case "closingNBV": return s.closingNBV;
     case "rate": return s.asset.rate_per_year;
     case "monthly": return s.monthlyDepreciation;
-    case "yearDepreciation": return s.yearDepreciation;
     case "closingAccumulated": return s.closingAccumulated;
-    case "openingNBV": return s.openingNBV;
-    case "closingNBV": return s.closingNBV;
     default:
       if (key.startsWith("m")) {
         const idx = Number(key.slice(1)) - 1;
@@ -288,19 +286,18 @@ function SchedulePage() {
                 <SortHead k="description" className="min-w-[180px]">Description</SortHead>
                 <SortHead k="location">Location</SortHead>
                 <SortHead k="purchase_date">Purchased</SortHead>
-                <SortHead k="openingCost" align="right">Cost 01.01</SortHead>
+                <SortHead k="costPurchase" align="right">Cost purchase</SortHead>
+                <SortHead k="openingNBV" align="right" className="border-l border-border">NBV 01.01</SortHead>
                 <SortHead k="additions" align="right" className="text-emerald-600 dark:text-emerald-400">Additions</SortHead>
                 <SortHead k="disposals" align="right" className="text-red-600 dark:text-red-400">Disposals</SortHead>
-                <SortHead k="closingCost" align="right">Cost 31.12</SortHead>
+                <SortHead k="yearDepreciation" align="right">Annual Depr.</SortHead>
+                <SortHead k="closingNBV" align="right" className="border-r border-border">NBV 31.12</SortHead>
                 <SortHead k="rate" align="right">Rate</SortHead>
                 <SortHead k="monthly" align="right">Monthly</SortHead>
                 {MONTH_LABELS.map((m, i) => (
                   <SortHead key={m} k={`m${i + 1}` as SortKey} align="right">{m}</SortHead>
                 ))}
-                <SortHead k="yearDepreciation" align="right" className="border-l border-border">Year Depr.</SortHead>
-                <SortHead k="closingAccumulated" align="right">Acc. Depr. 31.12</SortHead>
-                <SortHead k="openingNBV" align="right" className="border-l border-border">NBV 01.01</SortHead>
-                <SortHead k="closingNBV" align="right">NBV 31.12</SortHead>
+                <SortHead k="closingAccumulated" align="right" className="border-l border-border">Acc. Depr. 31.12</SortHead>
               </tr>
             </thead>
             <tbody>
@@ -323,10 +320,12 @@ function SchedulePage() {
                             <div className="text-muted-foreground">disp. {s.asset.disposal_date}</div>
                           )}
                         </td>
-                        <td className="text-right p-2 font-mono">{formatMoney(s.openingCost)}</td>
+                        <td className="text-right p-2 font-mono">{formatMoney(s.asset.purchase_price)}</td>
+                        <td className="text-right p-2 font-mono border-l border-border">{formatMoney(s.openingNBV)}</td>
                         <td className="text-right p-2 font-mono text-emerald-600 dark:text-emerald-400">{formatMoney(s.additions)}</td>
                         <td className="text-right p-2 font-mono text-red-600 dark:text-red-400">{formatMoney(s.disposals)}</td>
-                        <td className="text-right p-2 font-mono">{formatMoney(s.closingCost)}</td>
+                        <td className="text-right p-2 font-mono font-semibold">{formatMoney(s.yearDepreciation)}</td>
+                        <td className="text-right p-2 font-mono font-semibold border-r border-border">{formatMoney(s.closingNBV)}</td>
                         <td className="text-right p-2 font-mono text-muted-foreground">
                           {(s.asset.rate_per_year * 100).toFixed(1)}%
                         </td>
@@ -334,10 +333,7 @@ function SchedulePage() {
                         {s.months.map((m, i) => (
                           <td key={i} className="text-right p-2 font-mono">{formatMoney(m)}</td>
                         ))}
-                        <td className="text-right p-2 font-mono border-l border-border font-semibold">{formatMoney(s.yearDepreciation)}</td>
-                        <td className="text-right p-2 font-mono">{formatMoney(s.closingAccumulated)}</td>
-                        <td className="text-right p-2 font-mono border-l border-border">{formatMoney(s.openingNBV)}</td>
-                        <td className="text-right p-2 font-mono font-semibold">{formatMoney(s.closingNBV)}</td>
+                        <td className="text-right p-2 font-mono border-l border-border">{formatMoney(s.closingAccumulated)}</td>
                       </tr>
                     ))}
                     <SubtotalRow label={`Subtotal — ${category}`} totals={sub} monthly={subMonthly} tone="muted" />
@@ -364,7 +360,7 @@ function FragmentGroup({
   return (
     <>
       <tr className="bg-secondary/60">
-        <td colSpan={23} className="p-2 text-xs font-semibold uppercase tracking-wide text-secondary-foreground sticky left-0">
+        <td colSpan={25} className="p-2 text-xs font-semibold uppercase tracking-wide text-secondary-foreground sticky left-0">
           {category}
         </td>
       </tr>
@@ -376,24 +372,22 @@ function FragmentGroup({
 function totalsOf(rows: YearSchedule[]) {
   return rows.reduce(
     (acc, r) => ({
-      openingCost: acc.openingCost + r.openingCost,
+      costPurchase: acc.costPurchase + r.asset.purchase_price,
+      openingNBV: acc.openingNBV + r.openingNBV,
       additions: acc.additions + r.additions,
       disposals: acc.disposals + r.disposals,
-      closingCost: acc.closingCost + r.closingCost,
       yearDepreciation: acc.yearDepreciation + r.yearDepreciation,
-      closingAccumulated: acc.closingAccumulated + r.closingAccumulated,
-      openingNBV: acc.openingNBV + r.openingNBV,
       closingNBV: acc.closingNBV + r.closingNBV,
+      closingAccumulated: acc.closingAccumulated + r.closingAccumulated,
     }),
     {
-      openingCost: 0,
+      costPurchase: 0,
+      openingNBV: 0,
       additions: 0,
       disposals: 0,
-      closingCost: 0,
       yearDepreciation: 0,
-      closingAccumulated: 0,
-      openingNBV: 0,
       closingNBV: 0,
+      closingAccumulated: 0,
     },
   );
 }
@@ -414,19 +408,18 @@ function SubtotalRow({
     <tr className={`${bg} border-b border-border`}>
       <td className={`p-2 ${bg}`} />
       <td className={`p-2 text-foreground ${bg}`} colSpan={3}>{label}</td>
-      <td className="text-right p-2 font-mono">{formatMoney(totals.openingCost)}</td>
+      <td className="text-right p-2 font-mono">{formatMoney(totals.costPurchase)}</td>
+      <td className="text-right p-2 font-mono border-l border-border">{formatMoney(totals.openingNBV)}</td>
       <td className="text-right p-2 font-mono text-emerald-700 dark:text-emerald-300">{formatMoney(totals.additions)}</td>
       <td className="text-right p-2 font-mono text-red-700 dark:text-red-300">{formatMoney(totals.disposals)}</td>
-      <td className="text-right p-2 font-mono">{formatMoney(totals.closingCost)}</td>
+      <td className="text-right p-2 font-mono">{formatMoney(totals.yearDepreciation)}</td>
+      <td className="text-right p-2 font-mono border-r border-border">{formatMoney(totals.closingNBV)}</td>
       <td />
       <td />
       {monthly.map((m, i) => (
         <td key={i} className="text-right p-2 font-mono">{formatMoney(m)}</td>
       ))}
-      <td className="text-right p-2 font-mono border-l border-border">{formatMoney(totals.yearDepreciation)}</td>
-      <td className="text-right p-2 font-mono">{formatMoney(totals.closingAccumulated)}</td>
-      <td className="text-right p-2 font-mono border-l border-border">{formatMoney(totals.openingNBV)}</td>
-      <td className="text-right p-2 font-mono">{formatMoney(totals.closingNBV)}</td>
+      <td className="text-right p-2 font-mono border-l border-border">{formatMoney(totals.closingAccumulated)}</td>
     </tr>
   );
 }

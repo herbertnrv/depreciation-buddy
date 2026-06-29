@@ -11,18 +11,41 @@ type Row = {
   description: string;
   location: string;
   purchase: string;
-  openingCost: number;
+  costPurchase: number;
+  openingNBV: number;
   additions: number;
   disposals: number;
-  closingCost: number;
-  monthly: number;
-  rate: string;
-  months: number[];
   yearDepreciation: number;
-  closingAccumulated: number;
-  openingNBV: number;
   closingNBV: number;
+  rate: string;
+  monthly: number;
+  months: number[];
+  closingAccumulated: number;
 };
+
+function zeros() {
+  return {
+    costPurchase: 0,
+    openingNBV: 0,
+    additions: 0,
+    disposals: 0,
+    yearDepreciation: 0,
+    closingNBV: 0,
+    closingAccumulated: 0,
+    months: Array(12).fill(0) as number[],
+  };
+}
+
+function addInto(acc: ReturnType<typeof zeros>, s: YearSchedule) {
+  acc.costPurchase += s.asset.purchase_price;
+  acc.openingNBV += s.openingNBV;
+  acc.additions += s.additions;
+  acc.disposals += s.disposals;
+  acc.yearDepreciation += s.yearDepreciation;
+  acc.closingNBV += s.closingNBV;
+  acc.closingAccumulated += s.closingAccumulated;
+  for (let i = 0; i < 12; i++) acc.months[i] += s.months[i];
+}
 
 function buildRows(groups: [string, YearSchedule[]][]): Row[] {
   const rows: Row[] = [];
@@ -36,19 +59,19 @@ function buildRows(groups: [string, YearSchedule[]][]): Row[] {
         description: s.asset.description,
         location: s.asset.location ?? "",
         purchase: s.asset.purchase_date,
-        openingCost: s.openingCost,
+        costPurchase: s.asset.purchase_price,
+        openingNBV: s.openingNBV,
         additions: s.additions,
         disposals: s.disposals,
-        closingCost: s.closingCost,
-        monthly: s.monthlyDepreciation,
-        rate: `${(s.asset.rate_per_year * 100).toFixed(1)}%`,
-        months: s.months,
         yearDepreciation: s.yearDepreciation,
-        closingAccumulated: s.closingAccumulated,
-        openingNBV: s.openingNBV,
         closingNBV: s.closingNBV,
+        rate: `${(s.asset.rate_per_year * 100).toFixed(1)}%`,
+        monthly: s.monthlyDepreciation,
+        months: s.months,
+        closingAccumulated: s.closingAccumulated,
       });
       addInto(subtotal, s);
+      addInto(gtot, s);
     }
     rows.push({
       category,
@@ -61,15 +84,6 @@ function buildRows(groups: [string, YearSchedule[]][]): Row[] {
       monthly: 0,
       ...subtotal,
     });
-    for (let i = 0; i < 12; i++) gtot.months[i] += subtotal.months[i];
-    gtot.openingCost += subtotal.openingCost;
-    gtot.additions += subtotal.additions;
-    gtot.disposals += subtotal.disposals;
-    gtot.closingCost += subtotal.closingCost;
-    gtot.yearDepreciation += subtotal.yearDepreciation;
-    gtot.closingAccumulated += subtotal.closingAccumulated;
-    gtot.openingNBV += subtotal.openingNBV;
-    gtot.closingNBV += subtotal.closingNBV;
   }
   rows.push({
     category: "",
@@ -85,49 +99,22 @@ function buildRows(groups: [string, YearSchedule[]][]): Row[] {
   return rows;
 }
 
-function zeros() {
-  return {
-    months: Array(12).fill(0) as number[],
-    openingCost: 0,
-    additions: 0,
-    disposals: 0,
-    closingCost: 0,
-    yearDepreciation: 0,
-    closingAccumulated: 0,
-    openingNBV: 0,
-    closingNBV: 0,
-  };
-}
-
-function addInto(acc: ReturnType<typeof zeros>, s: YearSchedule) {
-  for (let i = 0; i < 12; i++) acc.months[i] += s.months[i];
-  acc.openingCost += s.openingCost;
-  acc.additions += s.additions;
-  acc.disposals += s.disposals;
-  acc.closingCost += s.closingCost;
-  acc.yearDepreciation += s.yearDepreciation;
-  acc.closingAccumulated += s.closingAccumulated;
-  acc.openingNBV += s.openingNBV;
-  acc.closingNBV += s.closingNBV;
-}
-
 const HEADERS = [
   "Category",
   "Inv #",
   "Description",
   "Location",
   "Purchased",
-  "Cost 01.01",
+  "Cost purchase",
+  "NBV 01.01",
   "Additions",
   "Disposals",
-  "Cost 31.12",
+  "Annual Depr.",
+  "NBV 31.12",
   "Rate",
   "Monthly",
   ...MONTH_LABELS,
-  "Year Depr.",
   "Acc. Depr. 31.12",
-  "NBV 01.01",
-  "NBV 31.12",
 ];
 
 const fmt = (n: number) => (n ? Number(n.toFixed(2)) : 0);
@@ -145,17 +132,16 @@ export function exportToExcel(
       r.description,
       r.location,
       r.purchase,
-      fmt(r.openingCost),
+      fmt(r.costPurchase),
+      fmt(r.openingNBV),
       fmt(r.additions),
       fmt(r.disposals),
-      fmt(r.closingCost),
+      fmt(r.yearDepreciation),
+      fmt(r.closingNBV),
       r.rate,
       fmt(r.monthly),
       ...r.months.map(fmt),
-      fmt(r.yearDepreciation),
       fmt(r.closingAccumulated),
-      fmt(r.openingNBV),
-      fmt(r.closingNBV),
     ]);
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -178,17 +164,16 @@ export function exportToPDF(
     r.description,
     r.location,
     r.purchase,
-    fmtCell(r.openingCost),
+    fmtCell(r.costPurchase),
+    fmtCell(r.openingNBV),
     fmtCell(r.additions),
     fmtCell(r.disposals),
-    fmtCell(r.closingCost),
+    fmtCell(r.yearDepreciation),
+    fmtCell(r.closingNBV),
     r.rate,
     fmtCell(r.monthly),
     ...r.months.map(fmtCell),
-    fmtCell(r.yearDepreciation),
     fmtCell(r.closingAccumulated),
-    fmtCell(r.openingNBV),
-    fmtCell(r.closingNBV),
   ]);
   autoTable(doc, {
     head: [HEADERS],
