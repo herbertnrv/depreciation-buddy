@@ -77,10 +77,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Fixed Asset Register" },
-      { name: "description", content: "Fixed asset register with monthly straight-line depreciation and automatic year-end rollover." },
-      { property: "og:title", content: "Fixed Asset Register" },
-      { property: "og:description", content: "Monthly depreciation schedule with automatic year rollover." },
+      { title: "GastronoAssets — Hotel & Gastro Service" },
+      { name: "description", content: "Offline fixed asset register with monthly straight-line depreciation and automatic year-end rollover." },
+      { property: "og:title", content: "GastronoAssets — Hotel & Gastro Service" },
+      { property: "og:description", content: "Offline fixed asset register for hotels and gastronomy." },
       { property: "og:type", content: "website" },
     ],
     links: [

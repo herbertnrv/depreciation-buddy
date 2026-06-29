@@ -25,9 +25,9 @@ function AppLayout() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto max-w-[1600px] px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-foreground">Fixed Asset Register</h1>
+            <h1 className="text-lg font-semibold text-foreground">GastronoAssets</h1>
             <p className="text-xs text-muted-foreground">
-              Monthly straight-line depreciation · automatic year-end rollover
+              Hotel & Gastro Service · Offline Fixed Asset Register
             </p>
           </div>
           <nav className="flex gap-2">
