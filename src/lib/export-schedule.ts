@@ -329,7 +329,7 @@ export function exportSummaryPDF(
   const sigY = pageH - 90;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("Ort, Datum: ____________________________", 40, sigY);
+  doc.text("Place, Date: ____________________________", 40, sigY);
 
   const colW = (pageW - 80) / 2;
   const line1X = 40;
@@ -338,8 +338,48 @@ export function exportSummaryPDF(
   doc.line(line1X, lineY, line1X + colW - 30, lineY);
   doc.line(line2X, lineY, line2X + colW - 30, lineY);
   doc.setFontSize(9);
-  doc.text("Unterschrift — erstellt", line1X, lineY + 14);
-  doc.text("Unterschrift — genehmigt", line2X, lineY + 14);
+  doc.text("Signature — prepared by", line1X, lineY + 14);
+  doc.text("Signature — approved by", line2X, lineY + 14);
 
-  doc.save(`anlagenspiegel-zusammenfassung-${year}.pdf`);
+  doc.save(`fixed-asset-summary-${year}.pdf`);
+}
+
+// Compute the same totals as the PDF, for use by the preview UI.
+export type SummaryTotals = {
+  category: string;
+  cost: number;
+  nbvOpen: number;
+  add: number;
+  disp: number;
+  depr: number;
+  nbvClose: number;
+};
+
+export function computeSummaryTotals(
+  groups: [string, YearSchedule[]][],
+): { rows: SummaryTotals[]; total: SummaryTotals } {
+  const rows: SummaryTotals[] = [];
+  const total: SummaryTotals = {
+    category: "TOTAL",
+    cost: 0, nbvOpen: 0, add: 0, disp: 0, depr: 0, nbvClose: 0,
+  };
+  for (const [category, schedules] of groups) {
+    const t: SummaryTotals = { category, cost: 0, nbvOpen: 0, add: 0, disp: 0, depr: 0, nbvClose: 0 };
+    for (const s of schedules) {
+      t.cost += s.asset.purchase_price;
+      t.nbvOpen += s.openingNBV;
+      t.add += s.additions;
+      t.disp += s.disposals;
+      t.depr += s.yearDepreciation;
+      t.nbvClose += s.closingNBV;
+    }
+    rows.push(t);
+    total.cost += t.cost;
+    total.nbvOpen += t.nbvOpen;
+    total.add += t.add;
+    total.disp += t.disp;
+    total.depr += t.depr;
+    total.nbvClose += t.nbvClose;
+  }
+  return { rows, total };
 }
