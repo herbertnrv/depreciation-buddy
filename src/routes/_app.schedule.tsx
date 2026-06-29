@@ -363,8 +363,8 @@ function SchedulePage() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr className="border-b border-border">
-                <SortHead k="asset_number" className="sticky left-0 bg-muted/50 z-10 min-w-[80px]">Inv #</SortHead>
-                <SortHead k="description" className="min-w-[180px]">Description</SortHead>
+                <SortHead k="asset_number" className="sticky top-0 left-0 z-30 bg-muted/50 min-w-[80px]">Inv #</SortHead>
+                <SortHead k="description" className="sticky top-0 left-[80px] z-20 bg-muted/50 min-w-[180px]">Description</SortHead>
                 <SortHead k="location">Location</SortHead>
                 <SortHead k="purchase_date">Purchased</SortHead>
                 <SortHead k="costPurchase" align="right">Cost purchase</SortHead>
@@ -393,7 +393,7 @@ function SchedulePage() {
                         <td className="p-2 sticky left-0 bg-card z-10 font-mono text-[10px]">
                           {s.asset.asset_number ?? "—"}
                         </td>
-                        <td className="p-2 font-medium text-foreground">{s.asset.description}</td>
+                        <td className="p-2 sticky left-[80px] bg-card z-10 font-medium text-foreground">{s.asset.description}</td>
                         <td className="p-2 text-muted-foreground">{s.asset.location ?? "—"}</td>
                         <td className="p-2 font-mono text-[10px]">
                           {s.asset.purchase_date}
