@@ -259,9 +259,9 @@ function SchedulePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportSummaryPDF(groups, year)}
+            onClick={() => setSummaryOpen(true)}
             disabled={schedules.length === 0}
-            title="Einseitige Zusammenfassung A4 quer"
+            title="One-page A4 landscape summary"
           >
             <FileText className="h-4 w-4 mr-2" /> Summary
           </Button>
