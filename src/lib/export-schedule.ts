@@ -407,3 +407,32 @@ export function computeSummaryTotals(
   }
   return { rows, total };
 }
+
+export function exportSummaryExcel(
+  groups: [string, YearSchedule[]][],
+  year: number,
+  options: SummaryPDFOptions = {},
+) {
+  const { rows, total } = computeSummaryTotals(groups);
+  const companyName = options.companyName ?? "GastronoAssets — Hotel & Gastro Service";
+  const aoa: (string | number)[][] = [];
+  aoa.push([companyName]);
+  aoa.push([`Fixed Asset Register — Summary — FY ${year}`]);
+  aoa.push([`As at 31.12.${year}`]);
+  aoa.push([]);
+  aoa.push(["Category", "Cost (purchase)", "NBV 01.01.", "Additions", "Disposals", "Depreciation", "NBV 31.12."]);
+  for (const r of rows) {
+    aoa.push([r.category, fmt(r.cost), fmt(r.nbvOpen), fmt(r.add), fmt(r.disp), fmt(r.depr), fmt(r.nbvClose)]);
+  }
+  aoa.push(["TOTAL", fmt(total.cost), fmt(total.nbvOpen), fmt(total.add), fmt(total.disp), fmt(total.depr), fmt(total.nbvClose)]);
+  aoa.push([]);
+  aoa.push([`Total depreciation ${year}:`, fmt(total.depr)]);
+  aoa.push([]);
+  aoa.push([`Place, Date:`, `${options.place ?? ""}${options.place && options.date ? ", " : ""}${options.date ?? ""}`]);
+  aoa.push([`Prepared by:`, options.preparedBy ?? ""]);
+  aoa.push([`Approved by:`, options.approvedBy ?? ""]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `Summary ${year}`);
+  XLSX.writeFile(wb, `fixed-asset-summary-${year}.xlsx`);
+}
