@@ -457,25 +457,50 @@ function SummaryPreviewDialog({
   const [preparedBy, setPreparedBy] = useState("");
   const [approvedBy, setApprovedBy] = useState("");
 
+  const printSummary = () => {
+    const node = document.getElementById("summary-print-area");
+    if (!node) return;
+    const w = window.open("", "_blank", "width=1100,height=800");
+    if (!w) return;
+    w.document.write(`<!doctype html><html><head><title>Summary ${year}</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #000; margin: 0; padding: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #404040; color: #fff; text-align: left; padding: 6px; }
+  td { padding: 6px; border-bottom: 1px solid #ddd; }
+  .right { text-align: right; font-family: ui-monospace, monospace; }
+  .total-row { background: #e6efff; font-weight: bold; }
+  .box { margin-top: 10px; padding: 8px 12px; border: 1px solid #bbb; background: #f5f7fa; display:flex; justify-content:space-between; font-weight:bold; }
+  .sig { margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; font-size: 11px; }
+  .sig .line { border-top: 1px solid #000; margin-top: 30px; }
+  .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px; }
+  h3 { margin: 0; font-size: 16px; }
+  .muted { color: #555; font-size: 10px; }
+</style></head><body>${node.innerHTML}<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);}</script></body></html>`);
+    w.document.close();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Summary preview — A4 landscape</DialogTitle>
         </DialogHeader>
 
+        <div className="overflow-y-auto flex-1 pr-1">
         {/* A4 landscape preview (842 x 595 pt), scaled to fit dialog */}
-        <div className="bg-white text-black border border-border rounded-md shadow-sm mx-auto"
+        <div id="summary-print-area" className="bg-white text-black border border-border rounded-md shadow-sm mx-auto"
              style={{ width: "100%", aspectRatio: "842 / 595" }}>
           <div className="h-full w-full p-6 flex flex-col">
-            <div className="flex justify-between items-start">
+            <div className="hdr flex justify-between items-start">
               <div>
                 <h3 className="text-xl font-bold">Fixed Asset Register — Summary</h3>
-                <p className="text-xs text-gray-600 mt-1">Financial year {year}</p>
+                <p className="text-xs text-gray-600 mt-1 muted">Financial year {year}</p>
               </div>
               <div className="text-right">
                 <p className="font-bold text-sm">{company}</p>
-                <p className="text-[10px] text-gray-600">As at 31.12.{year}</p>
+                <p className="text-[10px] text-gray-600 muted">As at 31.12.{year}</p>
               </div>
             </div>
 
@@ -483,39 +508,39 @@ function SummaryPreviewDialog({
               <thead>
                 <tr className="bg-neutral-700 text-white">
                   <th className="text-left p-2 font-semibold">Category</th>
-                  <th className="text-right p-2 font-semibold">Cost (purchase)</th>
-                  <th className="text-right p-2 font-semibold">NBV 01.01.</th>
-                  <th className="text-right p-2 font-semibold">Additions</th>
-                  <th className="text-right p-2 font-semibold">Disposals</th>
-                  <th className="text-right p-2 font-semibold">Depreciation</th>
-                  <th className="text-right p-2 font-semibold">NBV 31.12.</th>
+                  <th className="text-right p-2 font-semibold right">Cost (purchase)</th>
+                  <th className="text-right p-2 font-semibold right">NBV 01.01.</th>
+                  <th className="text-right p-2 font-semibold right">Additions</th>
+                  <th className="text-right p-2 font-semibold right">Disposals</th>
+                  <th className="text-right p-2 font-semibold right">Depreciation</th>
+                  <th className="text-right p-2 font-semibold right">NBV 31.12.</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.category} className="border-b border-neutral-200">
                     <td className="p-2 font-semibold">{r.category}</td>
-                    <td className="text-right p-2 font-mono">{formatMoney(r.cost)}</td>
-                    <td className="text-right p-2 font-mono">{formatMoney(r.nbvOpen)}</td>
-                    <td className="text-right p-2 font-mono">{formatMoney(r.add)}</td>
-                    <td className="text-right p-2 font-mono">{formatMoney(r.disp)}</td>
-                    <td className="text-right p-2 font-mono">{formatMoney(r.depr)}</td>
-                    <td className="text-right p-2 font-mono">{formatMoney(r.nbvClose)}</td>
+                    <td className="text-right p-2 font-mono right">{formatMoney(r.cost)}</td>
+                    <td className="text-right p-2 font-mono right">{formatMoney(r.nbvOpen)}</td>
+                    <td className="text-right p-2 font-mono right">{formatMoney(r.add)}</td>
+                    <td className="text-right p-2 font-mono right">{formatMoney(r.disp)}</td>
+                    <td className="text-right p-2 font-mono right">{formatMoney(r.depr)}</td>
+                    <td className="text-right p-2 font-mono right">{formatMoney(r.nbvClose)}</td>
                   </tr>
                 ))}
-                <tr className="bg-blue-50 font-bold">
+                <tr className="bg-blue-50 font-bold total-row">
                   <td className="p-2">TOTAL</td>
-                  <td className="text-right p-2 font-mono">{formatMoney(total.cost)}</td>
-                  <td className="text-right p-2 font-mono">{formatMoney(total.nbvOpen)}</td>
-                  <td className="text-right p-2 font-mono">{formatMoney(total.add)}</td>
-                  <td className="text-right p-2 font-mono">{formatMoney(total.disp)}</td>
-                  <td className="text-right p-2 font-mono">{formatMoney(total.depr)}</td>
-                  <td className="text-right p-2 font-mono">{formatMoney(total.nbvClose)}</td>
+                  <td className="text-right p-2 font-mono right">{formatMoney(total.cost)}</td>
+                  <td className="text-right p-2 font-mono right">{formatMoney(total.nbvOpen)}</td>
+                  <td className="text-right p-2 font-mono right">{formatMoney(total.add)}</td>
+                  <td className="text-right p-2 font-mono right">{formatMoney(total.disp)}</td>
+                  <td className="text-right p-2 font-mono right">{formatMoney(total.depr)}</td>
+                  <td className="text-right p-2 font-mono right">{formatMoney(total.nbvClose)}</td>
                 </tr>
               </tbody>
             </table>
 
-            <div className="mt-3 border border-neutral-300 bg-neutral-50 rounded px-3 py-2 flex justify-between items-center">
+            <div className="box mt-3 border border-neutral-300 bg-neutral-50 rounded px-3 py-2 flex justify-between items-center">
               <span className="font-bold text-sm">Total depreciation {year}:</span>
               <span className="font-bold text-base font-mono">{formatMoney(total.depr)}</span>
             </div>
@@ -531,15 +556,15 @@ function SummaryPreviewDialog({
                   {date || "____________"}
                 </span>
               </p>
-              <div className="grid grid-cols-2 gap-8 mt-10">
+              <div className="sig grid grid-cols-2 gap-8 mt-10">
                 <div>
                   <p className="text-[11px] mb-1 h-4">{preparedBy}</p>
-                  <div className="border-t border-black" />
+                  <div className="line border-t border-black" />
                   <p className="text-[10px] mt-1">Signature — prepared by</p>
                 </div>
                 <div>
                   <p className="text-[11px] mb-1 h-4">{approvedBy}</p>
-                  <div className="border-t border-black" />
+                  <div className="line border-t border-black" />
                   <p className="text-[10px] mt-1">Signature — approved by</p>
                 </div>
               </div>
@@ -565,16 +590,23 @@ function SummaryPreviewDialog({
             <Input id="sum-app" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Name" />
           </div>
         </div>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-wrap gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={printSummary}>Print</Button>
+          <Button
+            variant="outline"
+            onClick={() => exportSummaryExcel(groups, year, { place, date, preparedBy, approvedBy })}
+          >
+            Excel
+          </Button>
           <Button
             onClick={() => {
               exportSummaryPDF(groups, year, { place, date, preparedBy, approvedBy });
-              onOpenChange(false);
             }}
           >
-            <FileText className="h-4 w-4 mr-2" /> Download PDF
+            <FileText className="h-4 w-4 mr-2" /> PDF
           </Button>
         </DialogFooter>
       </DialogContent>
