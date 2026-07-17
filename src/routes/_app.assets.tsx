@@ -227,6 +227,7 @@ function AssetsPage() {
           <BackupButton />
           <RestoreButton />
           <ImportButton />
+          <DisposeButton assets={assets ?? []} />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button onClick={startNew}>
