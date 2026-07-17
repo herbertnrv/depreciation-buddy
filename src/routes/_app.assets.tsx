@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { localAssets } from "@/lib/local-db";
 import { ASSETS_QUERY_KEY, useAssets } from "@/lib/use-assets";
 import type { AssetInput } from "@/lib/depreciation";
-import { formatMoney } from "@/lib/depreciation";
+import { formatMoney, computeYearSchedule } from "@/lib/depreciation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Upload, AlertCircle, Download, FolderUp } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, AlertCircle, Download, FolderUp, PackageMinus } from "lucide-react";
 import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -227,6 +227,7 @@ function AssetsPage() {
           <BackupButton />
           <RestoreButton />
           <ImportButton />
+          <DisposeButton assets={assets ?? []} />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button onClick={startNew}>
@@ -618,5 +619,200 @@ function RestoreButton() {
         />
       </label>
     </Button>
+  );
+}
+
+const DISPOSED_CATEGORY = "Disposed assets";
+
+function computeDisposalValues(asset: AssetInput, disposalDate: string) {
+  const [dy, dm] = disposalDate.split("-").map(Number);
+  const year = dy;
+  const sched = computeYearSchedule(asset, year);
+  // Depreciation Jan..(disposal month - 1) inclusive of the year
+  const monthsThisYear = Math.max(0, dm - 1);
+  const yearDeprToDate = sched.months.slice(0, monthsThisYear).reduce((s, v) => s + v, 0);
+  const bookValueAtStartOfYear = sched.openingNBV;
+  const bookValueAtDisposal = Math.max(0, bookValueAtStartOfYear - yearDeprToDate);
+  return { year, bookValueAtStartOfYear, yearDeprToDate, bookValueAtDisposal };
+}
+
+function DisposeButton({ assets }: { assets: AssetInput[] }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState("");
+  const [assetId, setAssetId] = useState("");
+  const [disposalDate, setDisposalDate] = useState(new Date().toISOString().slice(0, 10));
+  const [proceeds, setProceeds] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const active = assets.filter((a) => !a.disposal_date && a.category !== DISPOSED_CATEGORY);
+  const categories = Array.from(new Set(active.map((a) => a.category))).sort((a, b) => a.localeCompare(b));
+  const inCategory = active.filter((a) => a.category === category);
+  const selected = active.find((a) => a.id === assetId) ?? null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const errors: string[] = [];
+  if (selected && disposalDate) {
+    if (disposalDate > today) errors.push("Disposal date must be today or in the past.");
+    if (disposalDate < selected.purchase_date) errors.push("Disposal date cannot be before the purchase date.");
+  }
+
+  const calc = selected && disposalDate && errors.length === 0
+    ? computeDisposalValues(selected, disposalDate)
+    : null;
+
+  const proceedsNum = Number(proceeds) || 0;
+  const bookValuePortion = calc ? Math.min(proceedsNum, calc.bookValueAtDisposal) : 0;
+  const extraordinaryGain = calc ? proceedsNum - calc.bookValueAtDisposal : 0;
+
+  const reset = () => {
+    setCategory(""); setAssetId(""); setProceeds("");
+    setDisposalDate(new Date().toISOString().slice(0, 10));
+  };
+
+  const confirm = async () => {
+    if (!selected || !calc) return;
+    setBusy(true);
+    try {
+      const note = [
+        `Disposed on ${disposalDate}.`,
+        `Original category: ${selected.category}.`,
+        `Book value at 01.01.${calc.year}: ${calc.bookValueAtStartOfYear.toFixed(2)}.`,
+        `Depreciation ${calc.year} up to disposal: ${calc.yearDeprToDate.toFixed(2)}.`,
+        `Book value at disposal: ${calc.bookValueAtDisposal.toFixed(2)}.`,
+        `Proceeds: ${proceedsNum.toFixed(2)} (book value portion ${bookValuePortion.toFixed(2)}, extraordinary ${extraordinaryGain >= 0 ? "gain" : "loss"} ${extraordinaryGain.toFixed(2)}).`,
+      ].join(" ");
+      await localAssets.update(selected.id, {
+        category: DISPOSED_CATEGORY,
+        disposal_date: disposalDate,
+        notes: note,
+      });
+      await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY, refetchType: "all" });
+      await qc.refetchQueries({ queryKey: ASSETS_QUERY_KEY });
+      toast.success(
+        `Asset disposed — book value ${bookValuePortion.toFixed(2)}, extraordinary ${extraordinaryGain >= 0 ? "gain" : "loss"} ${Math.abs(extraordinaryGain).toFixed(2)}`,
+      );
+      setOpen(false);
+      reset();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <PackageMinus className="h-4 w-4 mr-2" /> Dispose asset
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Dispose asset</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="mb-2 block">1. Category</Label>
+            <Select value={category} onValueChange={(v) => { setCategory(v); setAssetId(""); }}>
+              <SelectTrigger><SelectValue placeholder="Select category…" /></SelectTrigger>
+              <SelectContent>
+                {categories.length === 0 && <SelectItem value="__none" disabled>No assets available</SelectItem>}
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="mb-2 block">2. Asset</Label>
+            <Select value={assetId} onValueChange={setAssetId} disabled={!category}>
+              <SelectTrigger><SelectValue placeholder={category ? "Select asset…" : "Pick a category first"} /></SelectTrigger>
+              <SelectContent>
+                {inCategory.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {(a.asset_number ? `[${a.asset_number}] ` : "")}{a.description}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="mb-2 block">3. Disposal date</Label>
+            <Input
+              type="date"
+              value={disposalDate}
+              max={today}
+              min={selected?.purchase_date}
+              onChange={(e) => setDisposalDate(e.target.value)}
+              disabled={!selected}
+            />
+          </div>
+
+          {calc && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-1 font-mono">
+              <div className="flex justify-between"><span>Book value at 01.01.{calc.year}</span><span>{formatMoney(calc.bookValueAtStartOfYear)}</span></div>
+              <div className="flex justify-between"><span>Depreciation {calc.year} (Jan–month before disposal)</span><span>−{formatMoney(calc.yearDeprToDate)}</span></div>
+              <div className="flex justify-between font-semibold border-t border-border pt-1"><span>Book value at disposal</span><span>{formatMoney(calc.bookValueAtDisposal)}</span></div>
+            </div>
+          )}
+
+          <div>
+            <Label className="mb-2 block">4. Proceeds (sale price)</Label>
+            <Input
+              type="number"
+              value={proceeds}
+              onChange={(e) => setProceeds(e.target.value)}
+              disabled={!calc}
+              placeholder="0.00"
+            />
+          </div>
+
+          {calc && proceeds !== "" && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-1 font-mono">
+              <div className="flex justify-between"><span>Proceeds</span><span>{formatMoney(proceedsNum)}</span></div>
+              <div className="flex justify-between"><span>→ Book value portion</span><span>{formatMoney(bookValuePortion)}</span></div>
+              <div className="flex justify-between">
+                <span>→ Extraordinary {extraordinaryGain >= 0 ? "gain" : "loss"}</span>
+                <span className={extraordinaryGain >= 0 ? "text-emerald-600" : "text-destructive"}>
+                  {formatMoney(Math.abs(extraordinaryGain))}
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground pt-2 font-sans">
+                After confirmation the asset stays in inventory under category
+                <span className="font-semibold"> “{DISPOSED_CATEGORY}” </span>
+                with a closing book value of 0.
+              </div>
+            </div>
+          )}
+
+          {errors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Fix the following</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-5 space-y-1 mt-1">
+                  {errors.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button
+            onClick={confirm}
+            disabled={busy || !selected || !calc || proceeds === "" || errors.length > 0}
+          >
+            {busy ? "Saving…" : "Confirm disposal"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
