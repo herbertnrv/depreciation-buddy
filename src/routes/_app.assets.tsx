@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { localAssets } from "@/lib/local-db";
 import { ASSETS_QUERY_KEY, useAssets } from "@/lib/use-assets";
 import type { AssetInput } from "@/lib/depreciation";
-import { formatMoney } from "@/lib/depreciation";
+import { formatMoney, computeYearSchedule } from "@/lib/depreciation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
