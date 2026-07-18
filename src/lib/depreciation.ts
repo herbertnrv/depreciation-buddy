@@ -109,7 +109,9 @@ export function computeYearSchedule(
           ),
       )
     : 0;
-  const closingCost = openingCost + additions - disposals;
+  // When disposed within the year the asset leaves the register entirely:
+  // closing cost / accumulated / NBV all go to 0.
+  const closingCost = disposedInYear ? 0 : openingCost + additions;
 
   const openingAccumulated = accumulatedThrough(reportYear - 1, 12);
 
@@ -131,7 +133,7 @@ export function computeYearSchedule(
     openingAccumulated + yearDepreciation - disposalAccumulatedRemoved;
 
   const openingNBV = openingCost - openingAccumulated;
-  const closingNBV = closingCost - closingAccumulated;
+  const closingNBV = disposedInYear ? 0 : closingCost - closingAccumulated;
 
   return {
     asset,
