@@ -96,7 +96,19 @@ export function computeYearSchedule(
   const openingCost =
     acquiredBeforeOrIn && p.year < reportYear ? asset.purchase_price : 0;
   const additions = acquiredInYear ? asset.purchase_price : 0;
-  const disposals = disposedInYear ? asset.purchase_price : 0;
+  // Disposals show the residual book value (NBV) at disposal date,
+  // i.e. purchase price minus accumulated depreciation up to and including
+  // the month before disposal — not the original acquisition cost.
+  const disposals = disposedInYear
+    ? Math.max(
+        0,
+        asset.purchase_price -
+          accumulatedThrough(
+            disposal!.year,
+            disposal!.month,
+          ),
+      )
+    : 0;
   const closingCost = openingCost + additions - disposals;
 
   const openingAccumulated = accumulatedThrough(reportYear - 1, 12);
