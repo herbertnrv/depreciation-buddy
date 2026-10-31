@@ -1,0 +1,11 @@
+import { describe, it, expect } from 'vitest';
+import { acceptanceChecks } from './acceptance';
+import { computeYearSchedule, type AssetInput } from './depreciation';
+import { DEFAULT_SETTINGS } from './asset-model';
+describe('User acceptance cases',()=>{for(const check of acceptanceChecks())it(check.name,()=>expect(check.passed,check.actual).toBe(true));});
+const a:AssetInput={id:'a',asset_number:null,category:'Equipment',description:'Test',location:null,purchase_date:'2026-03-15',purchase_price:100000000,rate_per_year:.2,disposal_date:null};
+it('additional cost and residual determine depreciable cost',()=>{const s=computeYearSchedule({...a,additional_costs:20000000,residual_value:6000000},2026);expect(s.additions).toBe(120000000);expect(s.yearDepreciation).toBeCloseTo(19000000);});
+it('next month convention starts in April',()=>{const s=computeYearSchedule(a,2026,{...DEFAULT_SETTINGS,convention:'next-month'});expect(s.months[2]).toBe(0);expect(s.yearDepreciation).toBeCloseTo(15000000);});
+it('partial disposal retains 60 percent of cost',()=>{const s=computeYearSchedule({...a,disposals_history:[{date:'2026-07-15',type:'Sale',fraction:.4,proceeds:40000000,costs:0}]},2026);expect(s.closingCost).toBe(60000000);expect(s.openingNBV+s.additions-s.disposals-s.yearDepreciation).toBeCloseTo(s.closingNBV);});
+it('impairment reduces future depreciation and is separately reconciled',()=>{const s=computeYearSchedule({...a,impairments:[{date:'2026-06-30',amount:10000000,reason:'Damage'}]},2026);expect(s.impairment).toBe(10000000);expect(s.openingNBV+s.additions-s.disposals-s.yearDepreciation-s.impairment).toBeCloseTo(s.closingNBV);});
+it('impairment reversal cannot exceed the unimpaired carrying value',()=>{const s=computeYearSchedule({...a,impairments:[{date:'2026-06-30',amount:10000000,reason:'Damage'},{date:'2027-06-30',amount:10000000,reason:'Recovery',reversal:true}]},2027);const original=computeYearSchedule(a,2027);expect(s.closingNBV).toBeLessThanOrEqual(original.closingNBV+.00001);});

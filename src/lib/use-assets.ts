@@ -1,3 +1,4 @@
+import { useHydrated } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { localAssets } from "./local-db";
 import type { AssetInput } from "./depreciation";
@@ -9,10 +10,11 @@ export async function fetchAssets(): Promise<AssetInput[]> {
 }
 
 export function useAssets() {
+  const hydrated=useHydrated();
   return useQuery({
     queryKey: ASSETS_QUERY_KEY,
     queryFn: fetchAssets,
     // IndexedDB only exists in the browser; never run during SSR.
-    enabled: typeof window !== "undefined",
+    enabled: hydrated,
   });
 }
