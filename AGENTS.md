@@ -15,3 +15,6 @@
 - Store immutable closed-year schedules and audit events with backups; report later master-data changes as explicit next-period adjustments.
 - Keep Settings and accounting controls within the two existing content routes; preserve their search parameters.
 - Generate QR codes and report exports locally; attachments remain data URLs in IndexedDB and JSON backups.
+- Retain dated disposal, impairment and transfer movements in the pure schedule so journals and category rollforwards share the same calculation results.
+- Persist ledger reconciliation balances by year in IndexedDB and include them in backup/restore to retain accounting checks offline.
+- Protect dirty forms with TanStack navigation blockers; keep ISO date values in storage and show dd.mm.yyyy alongside native date controls.
