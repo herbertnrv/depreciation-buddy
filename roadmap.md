@@ -1,5 +1,12 @@
 # Required register improvements
 
+## Monthly posting vouchers (new request)
+- [x] Add /monthly with category totals, journal proposal, changes, detail and 12-month overview using unchanged schedule values.
+- [x] Add offline posted-month snapshots, reopening audit, sequence warnings and discrepancy banners; include in JSON backup/restore.
+- [x] Extend account mapping with account names and optional cost-centre overrides.
+- [x] Add A4 portrait PDF/Print, formula-based Excel, Journal CSV and full-year export.
+- [x] Run concrete acceptance tests (48 passed) and verify posting/export/reopening and account-name flows through the UI; A4 PDF visually checked.
+
 - [x] Phase 1 core implemented: calculation engine, migration, extended assets, settings, events, closing, audit and backups; 24 automated tests passed.
 - [x] Phase 2 core implemented: retained summary columns, expandable detail, checks, LAK formats, Excel formulas/frozen headers and A4 PDF; browser exports verified.
 - [x] Phase 3 controls implemented: ledger mapping, journal export, reconciliation, QR labels/count and acceptance test view; disposal and journals browser-verified.

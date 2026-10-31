@@ -40,6 +40,7 @@ function AppLayout() {
           </div>
           <nav className="flex flex-wrap items-center gap-2">
             {link("/schedule", "Depreciation Schedule")}
+            {link("/monthly", "Monthly Depreciation")}
             {link("/assets", "Assets")}
             <SettingsDialog/>
             <Button variant="outline" size="sm" aria-label="Language EN/DE" onClick={async()=>{await update({...settings,language:settings.language==='EN'?'DE':'EN'});}}>{settings.language} / {settings.language==='EN'?'DE':'EN'}</Button>

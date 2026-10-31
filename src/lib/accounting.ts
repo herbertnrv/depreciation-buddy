@@ -8,8 +8,8 @@ export function journalEntries(schedules:YearSchedule[],settings:Settings,monthl
  for(const s of schedules){
   const categoryAt=(date:string)=>s.depreciationCategories?.[Number(date.slice(5,7))-1]||s.category;
   const mapping=settings.accounts[s.category];
-  for(const category of new Set([s.category,s.asset.category,...(s.depreciationCategories||[])])){const accounts=settings.accounts[category];if(!accounts||Object.values(accounts).some(a=>!a.trim()))throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${category}.`);}
-  if(!mapping||Object.values(mapping).some(a=>!a.trim()))throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${s.category}.`);
+  for(const category of new Set([s.category,s.asset.category,...(s.depreciationCategories||[])])){const accounts=settings.accounts[category];if(!accounts||(['cost','accumulated','expense','gain','loss'] as const).some(k=>!accounts[k]?.trim()))throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${category}.`);}
+  if(!mapping||(['cost','accumulated','expense','gain','loss'] as const).some(k=>!mapping[k]?.trim()))throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${s.category}.`);
   const reportYear=(s as YearSchedule&{reportYear?:number}).reportYear||new Date().getFullYear();
   const text=(key:string)=>`${translate(key,settings.language)} ${s.asset.asset_number||s.asset.description}`;
   if(monthly)for(let i=0;i<12;i++){const day=new Date(Date.UTC(reportYear,i+1,0)).getUTCDate();const m=settings.accounts[s.depreciationCategories?.[i]||s.category];if(!m&&s.displayMonths[i])throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${s.depreciationCategories?.[i]}.`);post(s,`${reportYear}-${String(i+1).padStart(2,'0')}-${day}`,m?.expense||mapping.expense,m?.accumulated||mapping.accumulated,s.displayMonths[i],text('Depreciation'));}

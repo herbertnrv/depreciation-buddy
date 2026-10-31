@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppAssetsRouteImport } from './routes/_app.assets'
+import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppScheduleRouteImport } from './routes/_app.schedule'
 
 const IndexRoute = IndexRouteImport.update({
@@ -28,6 +29,11 @@ const AppAssetsRoute = AppAssetsRouteImport.update({
   path: '/assets',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMonthlyRoute = AppMonthlyRouteImport.update({
+  id: '/monthly',
+  path: '/monthly',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppScheduleRoute = AppScheduleRouteImport.update({
   id: '/schedule',
   path: '/schedule',
@@ -37,11 +43,13 @@ const AppScheduleRoute = AppScheduleRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assets': typeof AppAssetsRoute
+  '/monthly': typeof AppMonthlyRoute
   '/schedule': typeof AppScheduleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assets': typeof AppAssetsRoute
+  '/monthly': typeof AppMonthlyRoute
   '/schedule': typeof AppScheduleRoute
 }
 export interface FileRoutesById {
@@ -49,14 +57,21 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/_app/assets': typeof AppAssetsRoute
+  '/_app/monthly': typeof AppMonthlyRoute
   '/_app/schedule': typeof AppScheduleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/assets' | '/schedule'
+  fullPaths: '/' | '/assets' | '/monthly' | '/schedule'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/assets' | '/schedule'
-  id: '__root__' | '/' | '/_app' | '/_app/assets' | '/_app/schedule'
+  to: '/' | '/assets' | '/monthly' | '/schedule'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/assets'
+    | '/_app/monthly'
+    | '/_app/schedule'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAssetsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/monthly': {
+      id: '/_app/monthly'
+      path: '/monthly'
+      fullPath: '/monthly'
+      preLoaderRoute: typeof AppMonthlyRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/schedule': {
       id: '/_app/schedule'
       path: '/schedule'
@@ -99,11 +121,13 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAssetsRoute: typeof AppAssetsRoute
+  AppMonthlyRoute: typeof AppMonthlyRoute
   AppScheduleRoute: typeof AppScheduleRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAssetsRoute: AppAssetsRoute,
+  AppMonthlyRoute: AppMonthlyRoute,
   AppScheduleRoute: AppScheduleRoute,
 }
 
