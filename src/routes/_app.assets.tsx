@@ -69,10 +69,10 @@ function ImportButton() {
       setFileName(file.name);
       setOpen(true);
       if (res.assets.length === 0) {
-        toast.error("No importable rows found in this file.");
+        toast.error(t("No importable rows found in this file."));
       }
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(t((e as Error).message));
     }
   };
 
@@ -93,11 +93,11 @@ function ImportButton() {
       }));
       await localAssets.insert(records);
       await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
-      toast.success(`Imported ${parsed.length} assets`);
+      toast.success(`${t("Imported")} ${parsed.length} ${t("Assets")}`);
       setOpen(false);
       setParsed([]);
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(t((e as Error).message));
     } finally {
       setBusy(false);
     }
@@ -124,22 +124,22 @@ function ImportButton() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Import preview — {fileName}</DialogTitle>
+            <DialogTitle>{t("Import preview")} — {fileName}</DialogTitle>
           </DialogHeader>
           <div className="text-sm text-muted-foreground">
-            {parsed.length} asset(s) ready to import
-            {skipped > 0 && ` · ${skipped} row(s) skipped (missing date / price / rate)`}
+            {parsed.length} {t("asset(s) ready to import")}
+            {skipped > 0 && ` · ${skipped} ${t("row(s) skipped (missing date / price / rate)")}`}
           </div>
           <div className="max-h-96 overflow-auto rounded border border-border">
             <table className="w-full text-xs">
               <thead className="bg-muted/50 sticky top-0">
                 <tr>
-                  <th className="text-left p-2">Category</th>
-                  <th className="text-left p-2">Description</th>
-                  <th className="text-left p-2">Location</th>
-                  <th className="text-left p-2">Date</th>
-                  <th className="text-right p-2">Price</th>
-                  <th className="text-right p-2">Rate</th>
+                  <th className="text-left p-2">{t("Category")}</th>
+                  <th className="text-left p-2">{t("Description")}</th>
+                  <th className="text-left p-2">{t("Location")}</th>
+                  <th className="text-left p-2">{t("Date")}</th>
+                  <th className="text-right p-2">{t("Price")}</th>
+                  <th className="text-right p-2">{t("Rate")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -148,7 +148,7 @@ function ImportButton() {
                     <td className="p-2 text-muted-foreground">{a.category}</td>
                     <td className="p-2">{a.description}</td>
                     <td className="p-2 text-muted-foreground">{a.location ?? "—"}</td>
-                    <td className="p-2 font-mono">{a.purchase_date}</td>
+                    <td className="p-2 font-mono">{dateLabel(a.purchase_date)}</td>
                     <td className="p-2 text-right font-mono">{a.purchase_price.toLocaleString()}</td>
                     <td className="p-2 text-right font-mono">{(a.rate_per_year * 100).toFixed(1)}%</td>
                   </tr>
@@ -157,14 +157,14 @@ function ImportButton() {
             </table>
             {parsed.length > 200 && (
               <div className="p-2 text-xs text-muted-foreground text-center">
-                …and {parsed.length - 200} more
+                … {parsed.length - 200} {t("more")}
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>{t("Cancel")}</Button>
             <Button onClick={doImport} disabled={busy || parsed.length === 0}>
-              {busy ? "Importing…" : `Import ${parsed.length} assets`}
+              {busy ? t("Importing…") : `${t("Import")} ${parsed.length} ${t("Assets")}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -185,9 +185,9 @@ function BackupButton() {
       a.download = `gastronoassets-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Backup downloaded");
+      toast.success(t("Backup downloaded"));
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(t((e as Error).message));
     }
   };
   return (
@@ -204,15 +204,15 @@ function RestoreButton() {
     try {
       const text = await file.text();
       const mode = confirm(
-        "OK = REPLACE all existing data with the backup\nCancel = MERGE backup into current data",
+        t("OK = REPLACE all existing data with the backup\nCancel = MERGE backup into current data"),
       )
         ? "replace"
         : "merge";
       const n = await localAssets.importJson(text, mode); await refresh();
       await qc.invalidateQueries({ queryKey: ASSETS_QUERY_KEY });
-      toast.success(`Restored ${n} assets (${mode})`);
+      toast.success(`${t("Restored")} ${n} ${t("Assets")} (${t(mode)})`);
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error(t((e as Error).message));
     }
   };
   return (

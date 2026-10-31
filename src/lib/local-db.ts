@@ -6,10 +6,11 @@ export type NewAsset = Omit<AssetRecord, 'id' | 'created_at' | 'updated_at'>;
 export type AuditEntry = { id: string; assetId: string; date: string; action: string; field: string; oldValue: unknown; newValue: unknown };
 export type ClosedYear = { year: number; date: string; schedules: YearSchedule[]; settings: Settings };
 export type Snapshot = { id: string; date: string; data: string };
+export type LedgerBalances = Record<string,{cost:number;accumulated:number}>;
 export type Count = { id: string; assetId: string; date: string; location: string; result: 'Found' | 'Missing' };
 class GastronoAssetsDB extends Dexie {
   fixed_assets: Table<AssetRecord,string>; settings: Table<{id:string;value:Settings},string>;
-  audit: Table<AuditEntry,string>; closed_years: Table<ClosedYear,number>; snapshots: Table<Snapshot,string>; counts: Table<Count,string>;
+  audit: Table<AuditEntry,string>; closed_years: Table<ClosedYear,number>; snapshots: Table<Snapshot,string>; counts: Table<Count,string>; reconciliation_balances:Table<{year:number;balances:LedgerBalances},number>;
   constructor() {
     super('gastrono_assets');
     this.version(1).stores({fixed_assets:'id, category, purchase_date, asset_number, location'});
@@ -17,6 +18,8 @@ class GastronoAssetsDB extends Dexie {
       await tx.table('fixed_assets').toCollection().modify((a: AssetInput)=>Object.assign(a,normalizeAsset(a)));
       await tx.table('settings').put({id:'project',value:DEFAULT_SETTINGS});
     });
+    this.version(3).stores({reconciliation_balances:'year'});
+    this.reconciliation_balances=this.table('reconciliation_balances');
     this.fixed_assets=this.table('fixed_assets'); this.settings=this.table('settings'); this.audit=this.table('audit'); this.closed_years=this.table('closed_years'); this.snapshots=this.table('snapshots'); this.counts=this.table('counts');
   }
 }
@@ -62,7 +65,7 @@ export async function automaticSnapshot() {
   const data=await backupData(); await db().snapshots.add({id:uuid(),date:now(),data:JSON.stringify(data)});
   const rows=await db().snapshots.orderBy('date').toArray(); await db().snapshots.bulkDelete(rows.slice(0,Math.max(0,rows.length-10)).map(s=>s.id));
 }
-async function backupData() { return {app:'GastronoAssets',version:2,exported_at:now(),fixed_assets:await db().fixed_assets.toArray(),settings:await getSettings(),audit:await db().audit.toArray(),closed_years:await db().closed_years.toArray(),counts:await db().counts.toArray()}; }
+async function backupData() { return {app:'GastronoAssets',version:3,exported_at:now(),fixed_assets:await db().fixed_assets.toArray(),settings:await getSettings(),audit:await db().audit.toArray(),closed_years:await db().closed_years.toArray(),counts:await db().counts.toArray(),reconciliation_balances:await db().reconciliation_balances.toArray()}; }
 export const localAssets={
   async list():Promise<AssetInput[]> { const settings=await getSettings(); return (await db().fixed_assets.toArray()).map(a=>normalizeAsset(a,settings.reportingCurrency)).sort((a,b)=>a.category.localeCompare(b.category)||a.purchase_date.localeCompare(b.purchase_date)); },
   async insert(items:NewAsset|NewAsset[]):Promise<string> {
@@ -76,7 +79,10 @@ export const localAssets={
       if(patch.disposal_date!==undefined && patch.disposals_history===undefined) next.disposals_history=patch.disposal_date?[{date:patch.disposal_date,type:'Sale',fraction:1,proceeds:0,costs:0}]:[];
       const closed=(await db().closed_years.orderBy('year').last())?.year;
       if(closed!==undefined) {
-        for(const key of ['disposals_history','impairments','transfers'] as const) for(const e of next[key]||[]) if(Number(e.date.slice(0,4))<=closed && !JSON.stringify(old[key]||[]).includes(JSON.stringify(e))) throw new Error('This period is closed. Date the new transaction in an open year.');
+        for(const key of ['disposals_history','impairments','transfers'] as const) {
+          const historical=(events:typeof next[typeof key])=>(events||[]).filter(e=>Number(e.date.slice(0,4))<=closed);
+          if(JSON.stringify(historical(old[key]))!==JSON.stringify(historical(next[key]))) throw new Error('This period is closed. Date the new transaction in an open year.');
+        }
       }
       await assertValid(next,id); await db().fixed_assets.put(next);await logChanges(id,'Edit',old,next);
     });await automaticSnapshot();
@@ -89,10 +95,11 @@ export const localAssets={
     const settings={...DEFAULT_SETTINGS,...data.settings}; const rows:AssetRecord[]=data.fixed_assets.map((a:AssetRecord)=>normalizeAsset({...a,id:a.id||uuid()},settings.reportingCurrency));
     for(const a of rows) if(!(a.purchase_price>0)||!a.category||!a.purchase_date)throw new Error('Backup contains an invalid asset. No data has been changed.');
     await automaticSnapshot();
-    await db().transaction('rw',[db().fixed_assets,db().settings,db().audit,db().closed_years,db().counts,db().snapshots],async()=>{
-      if(mode==='replace') {await db().fixed_assets.clear();await db().audit.clear();await db().closed_years.clear();await db().counts.clear();}
+    await db().transaction('rw',[db().fixed_assets,db().settings,db().audit,db().closed_years,db().counts,db().snapshots,db().reconciliation_balances],async()=>{
+      if(mode==='replace') {await db().fixed_assets.clear();await db().audit.clear();await db().closed_years.clear();await db().counts.clear();await db().reconciliation_balances.clear();}
       await db().fixed_assets.bulkPut(rows); if(data.settings)await db().settings.put({id:'project',value:settings});
       if(data.audit)await db().audit.bulkPut(data.audit);if(data.closed_years)await db().closed_years.bulkPut(data.closed_years);if(data.counts)await db().counts.bulkPut(data.counts);
+      if(data.reconciliation_balances)await db().reconciliation_balances.bulkPut(data.reconciliation_balances);
       if(data.snapshots)await db().snapshots.bulkPut(data.snapshots);await logChanges('project','Restore',{}, {mode,assets:rows.length});
     });await automaticSnapshot();return rows.length;
   }
@@ -102,8 +109,20 @@ export async function schedulesForYear(year:number,settings?:Settings):Promise<Y
   const closed=await db().closed_years.get(year);if(closed)return closed.schedules;
   const prefs=settings||await getSettings();const assets=await localAssets.list();const live=assets.map(a=>computeYearSchedule(a,year,prefs));
   const prior=await db().closed_years.get(year-1);
-  if(prior){for(const s of live){const old=prior.schedules.find(p=>p.asset.id===s.asset.id);const frozen=old?.closingNBV||0;s.adjustment=s.openingNBV-frozen;s.openingNBV=frozen;}
-    for(const old of prior.schedules)if(old.closingNBV && !live.some(s=>s.asset.id===old.asset.id)) {const s=computeYearSchedule(old.asset,year,prefs); live.push({...s,openingNBV:old.closingNBV,openingCost:old.closingCost,openingAccumulated:old.closingAccumulated,months:Array(12).fill(0),displayMonths:Array(12).fill(0),yearDepreciation:0,additions:0,disposals:0,closingCost:0,closingAccumulated:0,closingNBV:0,adjustment:-old.closingNBV,status:'Deleted — adjustment'});}}
+  if(prior){for(const s of live){const old=prior.schedules.find(p=>p.asset.id===s.asset.id);const frozen=old?.closingNBV||0;s.costAdjustment=s.openingCost-(old?.closingCost||0);s.accumulatedAdjustment=s.openingAccumulated-(old?.closingAccumulated||0);s.adjustment=s.costAdjustment-s.accumulatedAdjustment;s.openingNBV=frozen;s.openingCost=old?.closingCost||0;s.openingAccumulated=old?.closingAccumulated||0;
+      if(s.categoryMovements){const opening=s.categoryMovements.find(r=>r.openingCost>0);if(opening){opening.openingCost-=s.costAdjustment;opening.openingAccumulated-=s.accumulatedAdjustment;opening.openingNBV-=s.adjustment;opening.additions+=s.adjustment;}}
+    }
+    for(const old of prior.schedules)if(old.closingNBV && !live.some(s=>s.asset.id===old.asset.id)) {const s=computeYearSchedule(old.asset,year,prefs); live.push({...s,openingNBV:old.closingNBV,openingCost:old.closingCost,openingAccumulated:old.closingAccumulated,months:Array(12).fill(0),displayMonths:Array(12).fill(0),yearDepreciation:0,additions:0,disposals:0,closingCost:0,closingAccumulated:0,closingNBV:0,adjustment:-old.closingNBV,costAdjustment:-old.closingCost,accumulatedAdjustment:-old.closingAccumulated,categoryMovements:undefined,transferMovements:[],disposalMovements:[],impairmentMovements:[],status:'Deleted — adjustment'});}}
   return live.filter(scheduleVisible);
 }
-export async function closeYear(year:number) { if(await db().closed_years.get(year))throw new Error('Year already closed.'); const settings=await getSettings(),schedules=await schedulesForYear(year,settings);await db().closed_years.add({year,date:now(),settings,schedules});await logChanges('project','Close year',{}, {year});await automaticSnapshot(); }
+export async function saveLedgerBalances(year:number,balances:LedgerBalances) {
+ await db().reconciliation_balances.put({year,balances});await automaticSnapshot();
+}
+export async function closeYear(year:number) {
+ await db().transaction('rw',[db().fixed_assets,db().settings,db().closed_years,db().audit,db().snapshots,db().counts,db().reconciliation_balances],async()=>{
+  if(await db().closed_years.get(year))throw new Error('Year already closed.');
+  const settings=await getSettings(),schedules=await schedulesForYear(year,settings);
+  await db().closed_years.add({year,date:now(),settings,schedules});
+  await logChanges('project','Close year',{}, {year});await automaticSnapshot();
+ });
+}

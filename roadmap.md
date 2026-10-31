@@ -4,7 +4,7 @@
 - [x] Phase 2 core implemented: retained summary columns, expandable detail, checks, LAK formats, Excel formulas/frozen headers and A4 PDF; browser exports verified.
 - [x] Phase 3 controls implemented: ledger mapping, journal export, reconciliation, QR labels/count and acceptance test view; disposal and journals browser-verified.
 - Deferred by request: dashboard and second tax depreciation book.
-## Parked at user request
+## Completion pass requested
 - [ ] Complete EN/DE coverage for remaining import messages, errors, audit values and accounting export text.
 - [ ] Verify multi-page PDF total-row placement and pagination; preview currently displays a single continuous sheet.
 - [ ] Verify physical QR printing/count export and year closing through the UI; automated closing tests passed.
