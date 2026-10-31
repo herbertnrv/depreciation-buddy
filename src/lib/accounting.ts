@@ -6,26 +6,28 @@ export function journalEntries(schedules:YearSchedule[],settings:Settings,monthl
  const rows:Journal[]=[];
  const post=(s:YearSchedule,date:string,debit:string,credit:string,amount:number,text:string)=>{const n=roundMoney(Math.abs(amount),settings.reportingCurrency);if(!n)return;if(amount<0)[debit,credit]=[credit,debit];rows.push({date,account:debit,debit:n,credit:0,text,costCentre:s.costCentre},{date,account:credit,debit:0,credit:n,text,costCentre:s.costCentre});};
  for(const s of schedules){
+  const categoryAt=(date:string)=>s.depreciationCategories?.[Number(date.slice(5,7))-1]||s.category;
   const mapping=settings.accounts[s.category];
+  for(const category of new Set([s.category,s.asset.category,...(s.depreciationCategories||[])])){const accounts=settings.accounts[category];if(!accounts||Object.values(accounts).some(a=>!a.trim()))throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${category}.`);}
   if(!mapping||Object.values(mapping).some(a=>!a.trim()))throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${s.category}.`);
   const reportYear=(s as YearSchedule&{reportYear?:number}).reportYear||new Date().getFullYear();
   const text=(key:string)=>`${translate(key,settings.language)} ${s.asset.asset_number||s.asset.description}`;
   if(monthly)for(let i=0;i<12;i++){const day=new Date(Date.UTC(reportYear,i+1,0)).getUTCDate();const m=settings.accounts[s.depreciationCategories?.[i]||s.category];if(!m&&s.displayMonths[i])throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${s.depreciationCategories?.[i]}.`);post(s,`${reportYear}-${String(i+1).padStart(2,'0')}-${day}`,m?.expense||mapping.expense,m?.accumulated||mapping.accumulated,s.displayMonths[i],text('Depreciation'));}
-  else post(s,`${reportYear}-12-31`,mapping.expense,mapping.accumulated,s.yearDepreciation,text('Depreciation'));
-  for(const movement of s.impairmentMovements||[{date:`${reportYear}-12-31`,amount:s.impairment}])post(s,movement.date,mapping.loss,mapping.accumulated,movement.amount,text('Impairment'));
+  else {const totals=new Map<string,number>();for(let i=0;i<12;i++){const category=s.depreciationCategories?.[i]||s.category;totals.set(category,(totals.get(category)||0)+s.displayMonths[i]);}for(const [category,amount] of totals){const m=settings.accounts[category];if(m)post(s,`${reportYear}-12-31`,m.expense,m.accumulated,amount,text('Depreciation'));}}
+  for(const movement of s.impairmentMovements||[{date:`${reportYear}-12-31`,amount:s.impairment}]){const m=settings.accounts[categoryAt(movement.date)]||mapping;post(s,movement.date,m.loss,m.accumulated,movement.amount,text('Impairment'));}
   for(const movement of s.transferMovements||[]){const from=settings.accounts[movement.from],to=settings.accounts[movement.to];if(!from||!to)throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${movement.from} / ${movement.to}.`);post(s,movement.date,to.cost,from.cost,movement.cost,text('Transfer'));post(s,movement.date,from.accumulated,to.accumulated,movement.accumulated,text('Transfer'));}
   const acquisition=settings.accounts[s.asset.category]||mapping;
   post(s,s.asset.purchase_date,acquisition.cost,'ACQUISITION_CLEARING',s.additions,text('Acquisition'));
   if(s.costAdjustment!==undefined){post(s,`${reportYear}-01-01`,mapping.cost,'ADJUSTMENT_CLEARING',s.costAdjustment,text('Prior-period adjustment'));post(s,`${reportYear}-01-01`,'ADJUSTMENT_CLEARING',mapping.accumulated,s.accumulatedAdjustment||0,text('Prior-period adjustment'));}
   else post(s,`${reportYear}-01-01`,mapping.cost,'ADJUSTMENT_CLEARING',s.adjustment,text('Prior-period adjustment'));
   const movements=s.disposalMovements||[{date:s.asset.disposals_history?.filter(e=>e.date.startsWith(String(reportYear))).at(-1)?.date||`${reportYear}-12-31`,cost:s.costRemoved,accumulated:s.disposalAccumulatedRemoved,nbv:s.disposals,proceeds:s.proceeds,costs:s.disposalCosts,gainLoss:s.gainLoss}];
-  for(const movement of movements){if(!movement.cost)continue;const {date}=movement;
+  for(const movement of movements){if(!movement.cost)continue;const {date}=movement;const disposalMapping=settings.accounts[categoryAt(date)]||mapping;
    const cost=roundMoney(movement.cost,settings.reportingCurrency),accumulated=roundMoney(movement.accumulated,settings.reportingCurrency),nbv=cost-accumulated;
    const net=roundMoney(movement.proceeds-movement.costs,settings.reportingCurrency),gain=net-nbv;
-   post(s,date,mapping.accumulated,mapping.cost,accumulated,text('Remove accumulated depreciation'));
-   post(s,date,'DISPOSAL_CLEARING',mapping.cost,nbv,text('Remove net book value'));
+   post(s,date,disposalMapping.accumulated,mapping.cost,accumulated,text('Remove accumulated depreciation'));
+   post(s,date,'DISPOSAL_CLEARING',disposalMapping.cost,nbv,text('Remove net book value'));
    post(s,date,'PROCEEDS_CLEARING','DISPOSAL_CLEARING',net,text('Net disposal proceeds'));
-   if(gain>=0)post(s,date,'DISPOSAL_CLEARING',mapping.gain,gain,text('Gain on disposal'));else post(s,date,mapping.loss,'DISPOSAL_CLEARING',-gain,text('Loss on disposal'));
+   if(gain>=0)post(s,date,'DISPOSAL_CLEARING',disposalMapping.gain,gain,text('Gain on disposal'));else post(s,date,disposalMapping.loss,'DISPOSAL_CLEARING',-gain,text('Loss on disposal'));
   }
  }
  return rows.sort((a,b)=>a.date.localeCompare(b.date));
