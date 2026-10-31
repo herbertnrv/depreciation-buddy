@@ -1,0 +1,7 @@
+import { useState } from 'react';
+import { Dialog,DialogContent,DialogHeader,DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { db, type AuditEntry } from '@/lib/local-db';
+import { useT } from '@/lib/i18n';
+import { dateLabel } from '@/lib/asset-model';
+export function AuditDialog({assetId}:{assetId?:string}) {const [open,setOpen]=useState(false),[rows,setRows]=useState<AuditEntry[]>([]);const t=useT();return <><Button size="sm" variant="outline" onClick={async()=>{setRows((assetId?await db().audit.where('assetId').equals(assetId).toArray():await db().audit.toArray()).sort((a,b)=>b.date.localeCompare(a.date)));setOpen(true);}}>{t('Audit trail')}</Button><Dialog open={open} onOpenChange={setOpen}><DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-auto"><DialogHeader><DialogTitle>{t('Audit trail')}</DialogTitle></DialogHeader><table className="w-full text-xs"><thead><tr>{['Date','Assets','Action','Field','Old value','New value'].map(x=><th key={x} className="text-left p-2">{t(x)}</th>)}</tr></thead><tbody>{rows.map(r=><tr className="border-t border-border" key={r.id}><td className="p-2 whitespace-nowrap">{dateLabel(r.date)} {r.date.slice(11,19)}</td><td className="p-2 max-w-24 break-all">{r.assetId}</td><td className="p-2">{r.action}</td><td className="p-2">{r.field}</td><td className="p-2 max-w-72 break-all">{JSON.stringify(r.oldValue)}</td><td className="p-2 max-w-72 break-all">{JSON.stringify(r.newValue)}</td></tr>)}</tbody></table></DialogContent></Dialog></>;}

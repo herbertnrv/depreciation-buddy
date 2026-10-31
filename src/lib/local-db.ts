@@ -26,10 +26,10 @@ const uuid=()=>crypto.randomUUID();
 const now=()=>new Date().toISOString();
 export async function getSettings(): Promise<Settings> { const row=await db().settings.get('project'); return {...DEFAULT_SETTINGS,...row?.value}; }
 export async function saveSettings(value: Settings) {
-  await db().transaction('rw',db().settings,db().audit,async()=>{
+  await db().transaction('rw',db().settings,db().audit,db().closed_years,async()=>{
     const old=await getSettings(); const closed=await db().closed_years.count();
     if(closed && (old.reportingCurrency!==value.reportingCurrency || old.convention!==value.convention)) throw new Error('Reporting currency and convention are locked after the first year closing.');
-    await db().settings.put({id:'project',value}); await logChanges('project','Settings',old,value);
+    await db().settings.put({id:'project',value}); await logChanges('project','Settings',{...old},{...value});
   }); await automaticSnapshot();
 }
 async function logChanges(assetId:string, action:string, old:Record<string,unknown>, value:Record<string,unknown>) {
