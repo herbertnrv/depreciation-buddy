@@ -8,3 +8,10 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Offline register architecture
+- Keep asset persistence and version migrations in IndexedDB via local-db; never move this register to cloud storage because existing offline records must remain available.
+- Keep calculation/model logic pure and shared between schedule, summary and accounting; use unrounded balances internally and currency-rounded display months.
+- Store immutable closed-year schedules and audit events with backups; report later master-data changes as explicit next-period adjustments.
+- Keep Settings and accounting controls within the two existing content routes; preserve their search parameters.
+- Generate QR codes and report exports locally; attachments remain data URLs in IndexedDB and JSON backups.
