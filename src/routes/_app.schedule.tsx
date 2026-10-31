@@ -1,3 +1,12 @@
+import { SummaryDialog } from '@/components/register/summary-dialog';
+import { useSettings } from '@/lib/settings-context';
+import { useT } from '@/lib/i18n';
+import { schedulesForYear,closeYear,db } from '@/lib/local-db';
+import { useQuery,useQueryClient } from '@tanstack/react-query';
+import { useHydrated } from '@tanstack/react-router';
+import { money,dateLabel } from '@/lib/asset-model';
+import { exportScheduleV2 } from '@/lib/report-export';
+import { toast } from 'sonner';
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { useMemo, useState } from "react";
@@ -74,6 +83,7 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/_app/schedule")({
   validateSearch: searchSchema,
+  head:()=>({meta:[{title:'GastronoAssets | Depreciation schedule'},{name:'description',content:'Monthly depreciation, year-end balances and A4 category summary.'},{property:'og:title',content:'GastronoAssets | Depreciation schedule'},{property:'og:description',content:'Offline monthly fixed-asset reporting.'},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]}),
   component: SchedulePage,
 });
 
@@ -116,23 +126,22 @@ function SchedulePage() {
   const { data: assets, isLoading, error } = useAssets();
   const [summaryOpen, setSummaryOpen] = useState(false);
 
-  const allSchedules = useMemo<YearSchedule[]>(() => {
-    if (!assets) return [];
-    return assets
-      .map((a) => computeYearSchedule(a, year))
-      .filter((s) => s.openingCost > 0 || s.additions > 0 || s.disposals > 0);
-  }, [assets, year]);
+  const {settings}=useSettings(),t=useT(),qc=useQueryClient(),hydrated=useHydrated();
+  const report=useQuery({queryKey:['report',year,assets,settings],queryFn:()=>schedulesForYear(year,settings),enabled:hydrated});
+  const closed=useQuery({queryKey:['closed',year],queryFn:()=>db().closed_years.get(year),enabled:hydrated});
+  const allSchedules=report.data||[];
+  const fmt=(n:number)=>money(n,settings.reportingCurrency);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    for (const s of allSchedules) set.add(s.asset.category);
+    for (const s of allSchedules) set.add(s.category);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allSchedules]);
 
   const schedules = useMemo<YearSchedule[]>(() => {
     const qNorm = (q ?? "").trim().toLowerCase();
     return allSchedules.filter((s) => {
-      if (category && category !== "__all__" && s.asset.category !== category) return false;
+      if (category && category !== "__all__" && s.category !== category) return false;
       if (qNorm) {
         const hay = `${s.asset.description ?? ""} ${s.asset.asset_number ?? ""} ${s.asset.location ?? ""}`.toLowerCase();
         if (!hay.includes(qNorm)) return false;
@@ -146,18 +155,18 @@ function SchedulePage() {
   const groups = useMemo<[string, YearSchedule[]][]>(() => {
     const map = new Map<string, YearSchedule[]>();
     for (const s of schedules) {
-      const arr = map.get(s.asset.category) ?? [];
+      const arr = map.get(s.category) ?? [];
       arr.push(s);
-      map.set(s.asset.category, arr);
+      map.set(s.category, arr);
     }
     const sorted = Array.from(map.entries()).sort(([a], [b]) =>
-      catDir === "asc" ? a.localeCompare(b) : b.localeCompare(a),
+      (catDir === "asc" ? 1 : -1) * ((settings.categoryOrder.indexOf(a)<0?999:settings.categoryOrder.indexOf(a))-(settings.categoryOrder.indexOf(b)<0?999:settings.categoryOrder.indexOf(b)) || a.localeCompare(b)),
     );
     for (const [, rows] of sorted) {
       rows.sort((a, b) => compare(a, b, sort, dir));
     }
     return sorted;
-  }, [schedules, sort, dir, catDir]);
+  }, [schedules, sort, dir, catDir, settings.categoryOrder]);
 
   const totals = useMemo(() => totalsOf(schedules), [schedules]);
   const monthlyTotals = useMemo(() => {
@@ -209,8 +218,8 @@ function SchedulePage() {
     const active = sort === k;
     const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
   return (
-    <th className={`p-0 font-medium sticky top-0 bg-muted/50 ${className}`}>
-      <button
+    <th className={`p-0 font-medium sticky top-0 bg-muted ${className}`}>
+      <Button variant="ghost"
           type="button"
           onClick={() => toggleSort(k)}
           className={`w-full h-full px-2 py-2 flex items-center gap-1 hover:text-foreground transition-colors ${
@@ -221,7 +230,7 @@ function SchedulePage() {
           {align === "right" && <Icon className={`h-3 w-3 ${active ? "" : "opacity-40"}`} />}
           <span>{children}</span>
           {align === "left" && <Icon className={`h-3 w-3 ${active ? "" : "opacity-40"}`} />}
-        </button>
+        </Button>
       </th>
     );
   };
@@ -231,21 +240,20 @@ function SchedulePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">
-            Depreciation Schedule — {year}
+            {t('Depreciation Schedule')} — {year} · {settings.reportingCurrency}
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Click any column header to sort. Exports follow the current sort order.
-          </p>
+
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" disabled={!!closed.data} onClick={async()=>{if(!confirm(settings.language==='DE'?`Jahr ${year} endgültig abschließen?`:`Close year ${year}? Figures will be frozen.`))return;try{await closeYear(year);await qc.invalidateQueries();}catch(e){toast.error((e as Error).message);}}}>{t(closed.data?'Closed':'Close year')}</Button>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Category</span>
+            <span className="text-xs text-muted-foreground">{t('Category')}</span>
             <Select value={category ?? "__all__"} onValueChange={setCategory}>
               <SelectTrigger className="w-[200px] h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">All categories</SelectItem>
+                <SelectItem value="__all__">{t('All categories')}</SelectItem>
                 {categories.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
@@ -264,7 +272,7 @@ function SchedulePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportToExcel(groups, year)}
+            onClick={() => exportScheduleV2(groups, year, settings, 'excel')}
             disabled={schedules.length === 0}
           >
             <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
@@ -272,7 +280,7 @@ function SchedulePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportToPDF(groups, year)}
+            onClick={() => exportScheduleV2(groups, year, settings, 'pdf')}
             disabled={schedules.length === 0}
           >
             <FileText className="h-4 w-4 mr-2" /> PDF
@@ -310,7 +318,7 @@ function SchedulePage() {
 
       <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-card/50 p-3">
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Search description / inv# / location</Label>
+          <Label className="text-xs text-muted-foreground">{t('Search description / inv# / location')}</Label>
           <Input
             className="w-[280px] h-9"
             placeholder="e.g. fridge, INV-001, kitchen"
@@ -319,7 +327,7 @@ function SchedulePage() {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Min purchase price</Label>
+          <Label className="text-xs text-muted-foreground">{t('Min purchase price')}</Label>
           <Input
             type="number"
             className="w-[140px] h-9"
@@ -329,7 +337,7 @@ function SchedulePage() {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Max purchase price</Label>
+          <Label className="text-xs text-muted-foreground">{t('Max purchase price')}</Label>
           <Input
             type="number"
             className="w-[140px] h-9"
@@ -339,7 +347,7 @@ function SchedulePage() {
           />
         </div>
         {(q || minPrice !== undefined || maxPrice !== undefined) && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
+          <Button variant="ghost" size="sm" onClick={clearFilters}>{t('Clear')}</Button>
         )}
         <div className="ml-auto text-xs text-muted-foreground">
           {schedules.length} of {allSchedules.length} assets
@@ -362,24 +370,24 @@ function SchedulePage() {
       {schedules.length > 0 && (
         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[calc(100vh-240px)]">
           <table className="w-full text-xs">
-            <thead className="bg-muted/50 text-muted-foreground">
+            <thead className="bg-muted text-muted-foreground">
               <tr className="border-b border-border">
-                <SortHead k="asset_number" className="sticky top-0 left-0 z-30 bg-muted/50 min-w-[80px]">Inv #</SortHead>
-                <SortHead k="description" className="sticky top-0 left-[80px] z-20 bg-muted/50 min-w-[180px]">Description</SortHead>
-                <SortHead k="location">Location</SortHead>
-                <SortHead k="purchase_date">Purchased</SortHead>
-                <SortHead k="costPurchase" align="right">Cost purchase</SortHead>
-                <SortHead k="openingNBV" align="right" className="border-l border-border">NBV 01.01</SortHead>
-                <SortHead k="additions" align="right" className="text-emerald-600 dark:text-emerald-400">Additions</SortHead>
-                <SortHead k="disposals" align="right" className="text-red-600 dark:text-red-400">Disposals</SortHead>
-                <SortHead k="yearDepreciation" align="right">Annual Depr.</SortHead>
-                <SortHead k="closingNBV" align="right" className="border-r border-border">NBV 31.12</SortHead>
-                <SortHead k="rate" align="right">Rate</SortHead>
-                <SortHead k="monthly" align="right">Monthly</SortHead>
+                <SortHead k="asset_number" className="sticky top-0 left-0 z-30 bg-muted min-w-[80px]">{t('Inv #')}</SortHead>
+                <SortHead k="description" className="sticky top-0 left-[80px] z-20 bg-muted min-w-[180px]">{t('Description')}</SortHead>
+                <SortHead k="location">{t('Location')}</SortHead>
+                <SortHead k="purchase_date">{t('Purchased')}</SortHead>
+                <SortHead k="costPurchase" align="right">{t('Cost 31.12.')}</SortHead>
+                <SortHead k="openingNBV" align="right" className="border-l border-border">{t('NBV 01.01.')}</SortHead>
+                <SortHead k="additions" align="right" className="text-chart-2">{t('Additions')}</SortHead>
+                <SortHead k="disposals" align="right" className="text-destructive">{t('Disposals')}</SortHead>
+                <SortHead k="yearDepreciation" align="right">{t('Annual Depr.')}</SortHead>
+                <SortHead k="closingNBV" align="right" className="border-r border-border">{t('NBV 31.12.')}</SortHead>
+                <SortHead k="rate" align="right">{t('Rate')}</SortHead>
+                <SortHead k="monthly" align="right">{t('Monthly')}</SortHead>
                 {MONTH_LABELS.map((m, i) => (
-                  <SortHead key={m} k={`m${i + 1}` as SortKey} align="right">{m}</SortHead>
+                  <SortHead key={m} k={`m${i + 1}` as SortKey} align="right">{t(m)}</SortHead>
                 ))}
-                <SortHead k="closingAccumulated" align="right" className="border-l border-border">Acc. Depr. 31.12</SortHead>
+                <SortHead k="closingAccumulated" align="right" className="border-l border-border">{t('Accumulated depreciation 31.12.')}</SortHead>
               </tr>
             </thead>
             <tbody>
@@ -397,25 +405,25 @@ function SchedulePage() {
                         <td className="p-2 sticky left-[80px] bg-card z-10 font-medium text-foreground">{s.asset.description}</td>
                         <td className="p-2 text-muted-foreground">{s.asset.location ?? "—"}</td>
                         <td className="p-2 font-mono text-[10px]">
-                          {s.asset.purchase_date}
+                          {dateLabel(s.asset.purchase_date)}
                           {s.asset.disposal_date && (
-                            <div className="text-muted-foreground">disp. {s.asset.disposal_date}</div>
+                            <div className="text-muted-foreground">disp. {t("Disposed")} {dateLabel(s.asset.disposal_date)}</div>
                           )}
                         </td>
-                        <td className="text-right p-2 font-mono">{formatMoney(s.asset.purchase_price)}</td>
-                        <td className="text-right p-2 font-mono border-l border-border">{formatMoney(s.openingNBV)}</td>
-                        <td className="text-right p-2 font-mono text-emerald-600 dark:text-emerald-400">{formatMoney(s.additions)}</td>
-                        <td className="text-right p-2 font-mono text-red-600 dark:text-red-400">{formatMoney(s.disposals)}</td>
-                        <td className="text-right p-2 font-mono font-semibold">{formatMoney(s.yearDepreciation)}</td>
-                        <td className="text-right p-2 font-mono font-semibold border-r border-border">{formatMoney(s.closingNBV)}</td>
+                        <td className="text-right p-2 font-mono">{fmt(s.closingCost)}</td>
+                        <td className="text-right p-2 font-mono border-l border-border">{fmt(s.openingNBV)}</td>
+                        <td className="text-right p-2 font-mono text-chart-2">{fmt(s.additions+s.adjustment)}</td>
+                        <td className="text-right p-2 font-mono text-destructive">{fmt(s.disposals)}</td>
+                        <td className="text-right p-2 font-mono font-semibold">{fmt(s.yearDepreciation+s.impairment)}</td>
+                        <td className="text-right p-2 font-mono font-semibold border-r border-border">{fmt(s.closingNBV)}</td>
                         <td className="text-right p-2 font-mono text-muted-foreground">
                           {(s.asset.rate_per_year * 100).toFixed(1)}%
                         </td>
-                        <td className="text-right p-2 font-mono text-muted-foreground">{formatMoney(s.monthlyDepreciation)}</td>
-                        {s.months.map((m, i) => (
-                          <td key={i} className="text-right p-2 font-mono">{formatMoney(m)}</td>
+                        <td className="text-right p-2 font-mono text-muted-foreground">{fmt(s.monthlyDepreciation)}</td>
+                        {s.displayMonths.map((m, i) => (
+                          <td key={i} className="text-right p-2 font-mono">{fmt(m)}</td>
                         ))}
-                        <td className="text-right p-2 font-mono border-l border-border">{formatMoney(s.closingAccumulated)}</td>
+                        <td className="text-right p-2 font-mono border-l border-border">{fmt(s.closingAccumulated)}</td>
                       </tr>
                     ))}
                     <SubtotalRow label={`Subtotal — ${category}`} totals={sub} monthly={subMonthly} tone="muted" />
@@ -429,188 +437,13 @@ function SchedulePage() {
         </div>
       )}
 
-      <SummaryPreviewDialog
+      <SummaryDialog
         open={summaryOpen}
         onOpenChange={setSummaryOpen}
         groups={groups}
         year={year}
       />
     </div>
-  );
-}
-
-function SummaryPreviewDialog({
-  open,
-  onOpenChange,
-  groups,
-  year,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  groups: [string, YearSchedule[]][];
-  year: number;
-}) {
-  const { rows, total } = useMemo(() => computeSummaryTotals(groups), [groups]);
-  const company = "GastronoAssets — Hotel & Gastro Service";
-  const [place, setPlace] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [preparedBy, setPreparedBy] = useState("");
-  const [approvedBy, setApprovedBy] = useState("");
-
-  const printSummary = () => {
-    const node = document.getElementById("summary-print-area");
-    if (!node) return;
-    const w = window.open("", "_blank", "width=1100,height=800");
-    if (!w) return;
-    w.document.write(`<!doctype html><html><head><title>Summary ${year}</title>
-<style>
-  @page { size: A4 landscape; margin: 10mm; }
-  body { font-family: Helvetica, Arial, sans-serif; color: #000; margin: 0; padding: 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { background: #404040; color: #fff; text-align: left; padding: 6px; }
-  td { padding: 6px; border-bottom: 1px solid #ddd; }
-  .right { text-align: right; font-family: ui-monospace, monospace; }
-  .total-row { background: #e6efff; font-weight: bold; }
-  .box { margin-top: 10px; padding: 8px 12px; border: 1px solid #bbb; background: #f5f7fa; display:flex; justify-content:space-between; font-weight:bold; }
-  .sig { margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; font-size: 11px; }
-  .sig .line { border-top: 1px solid #000; margin-top: 30px; }
-  .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px; }
-  h3 { margin: 0; font-size: 16px; }
-  .muted { color: #555; font-size: 10px; }
-</style></head><body>${node.innerHTML}<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);}</script></body></html>`);
-    w.document.close();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Summary preview — A4 landscape</DialogTitle>
-        </DialogHeader>
-
-        <div className="overflow-y-auto flex-1 pr-1">
-        {/* A4 landscape preview (842 x 595 pt), scaled to fit dialog */}
-        <div id="summary-print-area" className="bg-white text-black border border-border rounded-md shadow-sm mx-auto"
-             style={{ width: "100%", aspectRatio: "842 / 595" }}>
-          <div className="h-full w-full p-6 flex flex-col">
-            <div className="hdr flex justify-between items-start">
-              <div>
-                <h3 className="text-xl font-bold">Fixed Asset Register — Summary</h3>
-                <p className="text-xs text-gray-600 mt-1 muted">Financial year {year}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-sm">{company}</p>
-                <p className="text-[10px] text-gray-600 muted">As at 31.12.{year}</p>
-              </div>
-            </div>
-
-            <table className="w-full text-[11px] mt-4 border-collapse">
-              <thead>
-                <tr className="bg-neutral-700 text-white">
-                  <th className="text-left p-2 font-semibold">Category</th>
-                  <th className="text-right p-2 font-semibold right">Cost (purchase)</th>
-                  <th className="text-right p-2 font-semibold right">NBV 01.01.</th>
-                  <th className="text-right p-2 font-semibold right">Additions</th>
-                  <th className="text-right p-2 font-semibold right">Disposals</th>
-                  <th className="text-right p-2 font-semibold right">Depreciation</th>
-                  <th className="text-right p-2 font-semibold right">NBV 31.12.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.category} className="border-b border-neutral-200">
-                    <td className="p-2 font-semibold">{r.category}</td>
-                    <td className="text-right p-2 font-mono right">{formatMoney(r.cost)}</td>
-                    <td className="text-right p-2 font-mono right">{formatMoney(r.nbvOpen)}</td>
-                    <td className="text-right p-2 font-mono right">{formatMoney(r.add)}</td>
-                    <td className="text-right p-2 font-mono right">{formatMoney(r.disp)}</td>
-                    <td className="text-right p-2 font-mono right">{formatMoney(r.depr)}</td>
-                    <td className="text-right p-2 font-mono right">{formatMoney(r.nbvClose)}</td>
-                  </tr>
-                ))}
-                <tr className="bg-blue-50 font-bold total-row">
-                  <td className="p-2">TOTAL</td>
-                  <td className="text-right p-2 font-mono right">{formatMoney(total.cost)}</td>
-                  <td className="text-right p-2 font-mono right">{formatMoney(total.nbvOpen)}</td>
-                  <td className="text-right p-2 font-mono right">{formatMoney(total.add)}</td>
-                  <td className="text-right p-2 font-mono right">{formatMoney(total.disp)}</td>
-                  <td className="text-right p-2 font-mono right">{formatMoney(total.depr)}</td>
-                  <td className="text-right p-2 font-mono right">{formatMoney(total.nbvClose)}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="box mt-3 border border-neutral-300 bg-neutral-50 rounded px-3 py-2 flex justify-between items-center">
-              <span className="font-bold text-sm">Total depreciation {year}:</span>
-              <span className="font-bold text-base font-mono">{formatMoney(total.depr)}</span>
-            </div>
-
-            <div className="flex-1" />
-
-            <div className="text-[11px]">
-              <p>
-                Place, Date:{" "}
-                <span className="font-medium">
-                  {place || "____________"}
-                  {(place || date) && ", "}
-                  {date || "____________"}
-                </span>
-              </p>
-              <div className="sig grid grid-cols-2 gap-8 mt-10">
-                <div>
-                  <p className="text-[11px] mb-1 h-4">{preparedBy}</p>
-                  <div className="line border-t border-black" />
-                  <p className="text-[10px] mt-1">Signature — prepared by</p>
-                </div>
-                <div>
-                  <p className="text-[11px] mb-1 h-4">{approvedBy}</p>
-                  <div className="line border-t border-black" />
-                  <p className="text-[10px] mt-1">Signature — approved by</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-          <div className="space-y-1">
-            <Label htmlFor="sum-place">Place</Label>
-            <Input id="sum-place" value={place} onChange={(e) => setPlace(e.target.value)} placeholder="e.g. Berlin" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="sum-date">Date</Label>
-            <Input id="sum-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="sum-prep">Prepared by</Label>
-            <Input id="sum-prep" value={preparedBy} onChange={(e) => setPreparedBy(e.target.value)} placeholder="Name" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="sum-app">Approved by</Label>
-            <Input id="sum-app" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Name" />
-          </div>
-        </div>
-        </div>
-
-        <DialogFooter className="flex-wrap gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="outline" onClick={printSummary}>Print</Button>
-          <Button
-            variant="outline"
-            onClick={() => exportSummaryExcel(groups, year, { place, date, preparedBy, approvedBy })}
-          >
-            Excel
-          </Button>
-          <Button
-            onClick={() => {
-              exportSummaryPDF(groups, year, { place, date, preparedBy, approvedBy });
-            }}
-          >
-            <FileText className="h-4 w-4 mr-2" /> PDF
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -636,11 +469,11 @@ function FragmentGroup({
 function totalsOf(rows: YearSchedule[]) {
   return rows.reduce(
     (acc, r) => ({
-      costPurchase: acc.costPurchase + r.asset.purchase_price,
+      costPurchase: acc.costPurchase + r.closingCost,
       openingNBV: acc.openingNBV + r.openingNBV,
-      additions: acc.additions + r.additions,
+      additions: acc.additions + r.additions+r.adjustment,
       disposals: acc.disposals + r.disposals,
-      yearDepreciation: acc.yearDepreciation + r.yearDepreciation,
+      yearDepreciation: acc.yearDepreciation + r.yearDepreciation+r.impairment,
       closingNBV: acc.closingNBV + r.closingNBV,
       closingAccumulated: acc.closingAccumulated + r.closingAccumulated,
     }),
@@ -667,23 +500,24 @@ function SubtotalRow({
   monthly: number[];
   tone: "muted" | "grand";
 }) {
+  const {settings}=useSettings(); const fmt=(n:number)=>money(n,settings.reportingCurrency);
   const bg = tone === "grand" ? "bg-primary/10 font-bold" : "bg-muted/40 font-semibold";
   return (
     <tr className={`${bg} border-b border-border`}>
       <td className={`p-2 ${bg}`} />
       <td className={`p-2 text-foreground ${bg}`} colSpan={3}>{label}</td>
-      <td className="text-right p-2 font-mono">{formatMoney(totals.costPurchase)}</td>
-      <td className="text-right p-2 font-mono border-l border-border">{formatMoney(totals.openingNBV)}</td>
-      <td className="text-right p-2 font-mono text-emerald-700 dark:text-emerald-300">{formatMoney(totals.additions)}</td>
-      <td className="text-right p-2 font-mono text-red-700 dark:text-red-300">{formatMoney(totals.disposals)}</td>
-      <td className="text-right p-2 font-mono">{formatMoney(totals.yearDepreciation)}</td>
-      <td className="text-right p-2 font-mono border-r border-border">{formatMoney(totals.closingNBV)}</td>
+      <td className="text-right p-2 font-mono">{fmt(totals.costPurchase)}</td>
+      <td className="text-right p-2 font-mono border-l border-border">{fmt(totals.openingNBV)}</td>
+      <td className="text-right p-2 font-mono text-chart-2">{fmt(totals.additions+s.adjustment)}</td>
+      <td className="text-right p-2 font-mono text-destructive">{fmt(totals.disposals)}</td>
+      <td className="text-right p-2 font-mono">{fmt(totals.yearDepreciation+s.impairment)}</td>
+      <td className="text-right p-2 font-mono border-r border-border">{fmt(totals.closingNBV)}</td>
       <td />
       <td />
       {monthly.map((m, i) => (
-        <td key={i} className="text-right p-2 font-mono">{formatMoney(m)}</td>
+        <td key={i} className="text-right p-2 font-mono">{fmt(m)}</td>
       ))}
-      <td className="text-right p-2 font-mono border-l border-border">{formatMoney(totals.closingAccumulated)}</td>
+      <td className="text-right p-2 font-mono border-l border-border">{fmt(totals.closingAccumulated)}</td>
     </tr>
   );
 }
