@@ -1,4 +1,4 @@
-import { type YearSchedule } from './depreciation';
+import { type YearSchedule,type CategoryMovement } from './depreciation';
 import { type Settings, roundMoney } from './asset-model';
 import { translate } from './i18n';
 export type Journal={date:string;account:string;debit:number;credit:number;text:string;costCentre:string};
@@ -10,10 +10,12 @@ export function journalEntries(schedules:YearSchedule[],settings:Settings,monthl
   if(!mapping||Object.values(mapping).some(a=>!a.trim()))throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${s.category}.`);
   const reportYear=(s as YearSchedule&{reportYear?:number}).reportYear||new Date().getFullYear();
   const text=(key:string)=>`${translate(key,settings.language)} ${s.asset.asset_number||s.asset.description}`;
-  if(monthly)for(let i=0;i<12;i++){const day=new Date(Date.UTC(reportYear,i+1,0)).getUTCDate();post(s,`${reportYear}-${String(i+1).padStart(2,'0')}-${day}`,mapping.expense,mapping.accumulated,s.displayMonths[i],text('Depreciation'));}
+  if(monthly)for(let i=0;i<12;i++){const day=new Date(Date.UTC(reportYear,i+1,0)).getUTCDate();const m=settings.accounts[s.depreciationCategories?.[i]||s.category];if(!m&&s.displayMonths[i])throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${s.depreciationCategories?.[i]}.`);post(s,`${reportYear}-${String(i+1).padStart(2,'0')}-${day}`,m?.expense||mapping.expense,m?.accumulated||mapping.accumulated,s.displayMonths[i],text('Depreciation'));}
   else post(s,`${reportYear}-12-31`,mapping.expense,mapping.accumulated,s.yearDepreciation,text('Depreciation'));
   for(const movement of s.impairmentMovements||[{date:`${reportYear}-12-31`,amount:s.impairment}])post(s,movement.date,mapping.loss,mapping.accumulated,movement.amount,text('Impairment'));
-  post(s,s.asset.purchase_date,mapping.cost,'ACQUISITION_CLEARING',s.additions,text('Acquisition'));
+  for(const movement of s.transferMovements||[]){const from=settings.accounts[movement.from],to=settings.accounts[movement.to];if(!from||!to)throw new Error(`${translate('Complete all ledger accounts for',settings.language)} ${movement.from} / ${movement.to}.`);post(s,movement.date,to.cost,from.cost,movement.cost,text('Transfer'));post(s,movement.date,from.accumulated,to.accumulated,movement.accumulated,text('Transfer'));}
+  const acquisition=settings.accounts[s.asset.category]||mapping;
+  post(s,s.asset.purchase_date,acquisition.cost,'ACQUISITION_CLEARING',s.additions,text('Acquisition'));
   if(s.costAdjustment!==undefined){post(s,`${reportYear}-01-01`,mapping.cost,'ADJUSTMENT_CLEARING',s.costAdjustment,text('Prior-period adjustment'));post(s,`${reportYear}-01-01`,'ADJUSTMENT_CLEARING',mapping.accumulated,s.accumulatedAdjustment||0,text('Prior-period adjustment'));}
   else post(s,`${reportYear}-01-01`,mapping.cost,'ADJUSTMENT_CLEARING',s.adjustment,text('Prior-period adjustment'));
   const movements=s.disposalMovements||[{date:s.asset.disposals_history?.filter(e=>e.date.startsWith(String(reportYear))).at(-1)?.date||`${reportYear}-12-31`,cost:s.costRemoved,accumulated:s.disposalAccumulatedRemoved,nbv:s.disposals,proceeds:s.proceeds,costs:s.disposalCosts,gainLoss:s.gainLoss}];
@@ -29,3 +31,11 @@ export function journalEntries(schedules:YearSchedule[],settings:Settings,monthl
  return rows.sort((a,b)=>a.date.localeCompare(b.date));
 }
 export function reconciliation(schedules:YearSchedule[],balances:Record<string,{cost:number;accumulated:number}>){const categories=[...new Set([...schedules.map(s=>s.category),...Object.keys(balances)])];return categories.map(category=>{const ss=schedules.filter(s=>s.category===category),cost=ss.reduce((n,s)=>n+s.closingCost,0),accumulated=ss.reduce((n,s)=>n+s.closingAccumulated,0),gl=balances[category]||{cost:0,accumulated:0};return {category,cost,accumulated,glCost:gl.cost,glAccumulated:gl.accumulated,costDifference:gl.cost-cost,accumulatedDifference:gl.accumulated-accumulated};});}
+
+export function categoryRollforward(schedules:YearSchedule[]):CategoryMovement[]{
+ const rows=new Map<string,CategoryMovement>();
+ for(const schedule of schedules){const movements=schedule.categoryMovements||[{category:schedule.category,openingCost:schedule.openingCost,openingAccumulated:schedule.openingAccumulated,openingNBV:schedule.openingNBV,additions:schedule.additions+schedule.adjustment,transfersIn:0,transfersOut:0,disposals:schedule.disposals,depreciation:schedule.yearDepreciation,impairment:schedule.impairment,closingCost:schedule.closingCost,closingAccumulated:schedule.closingAccumulated,closingNBV:schedule.closingNBV}];
+  for(const movement of movements){const old=rows.get(movement.category);if(!old)rows.set(movement.category,{...movement});else for(const key of Object.keys(movement) as (keyof CategoryMovement)[])if(key!=='category')old[key]+=movement[key];}
+ }
+ return [...rows.values()].sort((a,b)=>a.category.localeCompare(b.category));
+}
