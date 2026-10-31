@@ -1,6 +1,6 @@
 import { type YearSchedule, totalCost } from './depreciation';
 import { DEFAULT_SETTINGS, type Settings, roundMoney } from './asset-model';
-export type VoucherAsset = { id:string; number:string; description:string; category:string; costCentre:string; location:string; cost:number; depreciation:number; ytd:number; accumulated:number; nbv:number };
+export type VoucherAsset = { id:string; number:string; description:string; category:string; costCentre:string; location:string; cost:number; depreciation:number; ytd:number; ytdByCategory?:Record<string,number>; accumulated:number; nbv:number };
 export type VoucherChange = { number:string; description:string; category:string; costCentre:string; event:'Addition'|'Disposal depreciation'|'NBV removed'|'Gain / (Loss) on disposal'|'Fully depreciated'; amount:number };
 export type VoucherCategory = { category:string; count:number; depreciation:number; ytd:number; accumulated:number; nbv:number };
 export type VoucherJournal = { voucher:string; date:string; account:string; accountName:string; debit:number; credit:number; text:string; costCentre:string };
@@ -22,7 +22,8 @@ export function createVoucher(schedules:YearSchedule[],year:number,month:number,
   let nbv=cost-accumulated;
   if(month===12){cost=s.closingCost;accumulated=s.closingAccumulated;nbv=s.closingNBV;}
   const depreciation=s.displayMonths[month-1]||0;
-  const item={id:a.id,number:a.asset_number||'',description:a.description,category,costCentre,location:a.location||'',cost,depreciation,ytd:sum(s.displayMonths.slice(0,month)),accumulated,nbv};
+  const ytdByCategory:Record<string,number>={};for(let i=0;i<month;i++){const cat=s.depreciationCategories?.[i]||s.category;ytdByCategory[cat]=(ytdByCategory[cat]||0)+s.displayMonths[i];}
+  const item={id:a.id,number:a.asset_number||'',description:a.description,category,costCentre,location:a.location||'',cost,depreciation,ytd:sum(s.displayMonths.slice(0,month)),ytdByCategory,accumulated,nbv};
   // Retain activity even when an asset has no balance (e.g. its disposal month).
   if(acquired&&(cost>1e-7||item.ytd!==0||(s.disposalMovements||[]).some(e=>e.date>=p.start&&e.date<=p.end)))assets.push(item);
   const change=(event:VoucherChange['event'],amount:number)=>changes.push({number:item.number,description:item.description,category,costCentre,event,amount});
@@ -38,7 +39,7 @@ export function createVoucher(schedules:YearSchedule[],year:number,month:number,
 type VoucherBasis=Omit<MonthlyVoucher,'categories'|'journal'|'warnings'|'total'>;
 function assemble(base:VoucherBasis):MonthlyVoucher {
  const grouped=new Map<string,VoucherCategory>();const warnings=new Set<string>();const posting=new Map<string,{category:string;centre:string;amount:number}>();
- for(const a of base.assets){const row=grouped.get(a.category)||{category:a.category,count:0,depreciation:0,ytd:0,accumulated:0,nbv:0};row.count++;row.depreciation+=a.depreciation;row.ytd+=a.ytd;row.accumulated+=a.accumulated;row.nbv+=a.nbv;grouped.set(a.category,row);const key=JSON.stringify([a.category,a.costCentre]);const j=posting.get(key)||{category:a.category,centre:a.costCentre,amount:0};j.amount+=a.depreciation;posting.set(key,j);}
+ for(const a of base.assets){const row=grouped.get(a.category)||{category:a.category,count:0,depreciation:0,ytd:0,accumulated:0,nbv:0};row.count++;row.depreciation+=a.depreciation;row.accumulated+=a.accumulated;row.nbv+=a.nbv;grouped.set(a.category,row);for(const [cat,value] of Object.entries(a.ytdByCategory||{[a.category]:a.ytd})){const r=grouped.get(cat)||{category:cat,count:0,depreciation:0,ytd:0,accumulated:0,nbv:0};r.ytd+=value;grouped.set(cat,r);}const key=JSON.stringify([a.category,a.costCentre]);const j=posting.get(key)||{category:a.category,centre:a.costCentre,amount:0};j.amount+=a.depreciation;posting.set(key,j);}
  const journal:VoucherJournal[]=[];
  for(const r of posting.values()){if(!r.amount)continue;const account=base.settings.accounts[r.category];const override=base.settings.costCentreAccounts?.[r.centre];const expense=override?.expense||account?.expense||'',expenseName=override?.expenseName||account?.expenseName||'';
   if(!expense||!account?.accumulated)warnings.add(r.category);
