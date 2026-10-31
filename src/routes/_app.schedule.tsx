@@ -508,9 +508,9 @@ function SubtotalRow({
       <td className={`p-2 text-foreground ${bg}`} colSpan={3}>{label}</td>
       <td className="text-right p-2 font-mono">{fmt(totals.costPurchase)}</td>
       <td className="text-right p-2 font-mono border-l border-border">{fmt(totals.openingNBV)}</td>
-      <td className="text-right p-2 font-mono text-chart-2">{fmt(totals.additions+s.adjustment)}</td>
+      <td className="text-right p-2 font-mono text-chart-2">{fmt(totals.additions)}</td>
       <td className="text-right p-2 font-mono text-destructive">{fmt(totals.disposals)}</td>
-      <td className="text-right p-2 font-mono">{fmt(totals.yearDepreciation+s.impairment)}</td>
+      <td className="text-right p-2 font-mono">{fmt(totals.yearDepreciation)}</td>
       <td className="text-right p-2 font-mono border-r border-border">{fmt(totals.closingNBV)}</td>
       <td />
       <td />
