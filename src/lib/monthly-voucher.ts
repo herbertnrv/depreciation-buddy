@@ -24,7 +24,7 @@ export function createVoucher(schedules:YearSchedule[],year:number,month:number,
   const depreciation=s.displayMonths[month-1]||0;
   const item={id:a.id,number:a.asset_number||'',description:a.description,category,costCentre,location:a.location||'',cost,depreciation,ytd:sum(s.displayMonths.slice(0,month)),accumulated,nbv};
   // Retain activity even when an asset has no balance (e.g. its disposal month).
-  if(acquired&&(cost>1e-7||depreciation!==0||(s.disposalMovements||[]).some(e=>e.date>=p.start&&e.date<=p.end)))assets.push(item);
+  if(acquired&&(cost>1e-7||item.ytd!==0||(s.disposalMovements||[]).some(e=>e.date>=p.start&&e.date<=p.end)))assets.push(item);
   const change=(event:VoucherChange['event'],amount:number)=>changes.push({number:item.number,description:item.description,category,costCentre,event,amount});
   const service=a.in_service_date||a.purchase_date;
   let first=service.slice(0,7);if(settings.convention==='next-month'){const d=new Date(`${service}T00:00:00Z`);d.setUTCMonth(d.getUTCMonth()+1,1);first=d.toISOString().slice(0,7);}
