@@ -12,10 +12,10 @@ export type ExtendedAsset = {
   attachments?: Attachment[]; disposals_history?: Disposal[]; impairments?: Impairment[];
   transfers?: Transfer[]; notes?: string | null;
 };
-export type AccountMap = { cost: string; accumulated: string; expense: string; gain: string; loss: string };
+export type AccountMap = { cost: string; accumulated: string; expense: string; gain: string; loss: string; costName?:string; accumulatedName?:string; expenseName?:string; gainName?:string; lossName?:string };
 export type Settings = { language: 'EN' | 'DE'; reportingCurrency: string; convention: Convention;
   threshold: number; companyName: string; costCentres: string[]; categoryOrder: string[];
-  accounts: Record<string, AccountMap>; lastManualBackup?: string };
+  accounts: Record<string, AccountMap>; costCentreAccounts?:Record<string,{expense:string;expenseName:string}>; lastManualBackup?: string };
 export const DEFAULT_SETTINGS: Settings = { language: 'EN', reportingCurrency: 'LAK', convention: 'full-month', threshold: 0,
   companyName: 'GastronoAssets — Hotel & Gastro Service', costCentres: ['Hotel', 'Restaurant', 'Administration'], categoryOrder: [], accounts: {} };
 export function precision(currency: string) { return currency === 'LAK' ? 0 : 2; }

@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import { computeYearSchedule, normalizeAsset, scheduleVisible, type AssetInput, type YearSchedule } from './depreciation';
 import { DEFAULT_SETTINGS, type Settings } from './asset-model';
+import { createVoucher, type PostedMonth } from './monthly-voucher';
 export type AssetRecord = AssetInput & { created_at?: string; updated_at?: string };
 export type NewAsset = Omit<AssetRecord, 'id' | 'created_at' | 'updated_at'>;
 export type AuditEntry = { id: string; assetId: string; date: string; action: string; field: string; oldValue: unknown; newValue: unknown };
@@ -9,6 +10,7 @@ export type Snapshot = { id: string; date: string; data: string };
 export type LedgerBalances = Record<string,{cost:number;accumulated:number}>;
 export type Count = { id: string; assetId: string; date: string; location: string; result: 'Found' | 'Missing' };
 class GastronoAssetsDB extends Dexie {
+  posted_months:Table<PostedMonth,string>;
   fixed_assets: Table<AssetRecord,string>; settings: Table<{id:string;value:Settings},string>;
   audit: Table<AuditEntry,string>; closed_years: Table<ClosedYear,number>; snapshots: Table<Snapshot,string>; counts: Table<Count,string>; reconciliation_balances:Table<{year:number;balances:LedgerBalances},number>;
   constructor() {
@@ -19,6 +21,8 @@ class GastronoAssetsDB extends Dexie {
       await tx.table('settings').put({id:'project',value:DEFAULT_SETTINGS});
     });
     this.version(3).stores({reconciliation_balances:'year'});
+    this.version(4).stores({posted_months:'id,year,month'});
+    this.posted_months=this.table('posted_months');
     this.reconciliation_balances=this.table('reconciliation_balances');
     this.fixed_assets=this.table('fixed_assets'); this.settings=this.table('settings'); this.audit=this.table('audit'); this.closed_years=this.table('closed_years'); this.snapshots=this.table('snapshots'); this.counts=this.table('counts');
   }
@@ -65,7 +69,7 @@ export async function automaticSnapshot() {
   const data=await backupData(); await db().snapshots.add({id:uuid(),date:now(),data:JSON.stringify(data)});
   const rows=await db().snapshots.orderBy('date').toArray(); await db().snapshots.bulkDelete(rows.slice(0,Math.max(0,rows.length-10)).map(s=>s.id));
 }
-async function backupData() { return {app:'GastronoAssets',version:3,exported_at:now(),fixed_assets:await db().fixed_assets.toArray(),settings:await getSettings(),audit:await db().audit.toArray(),closed_years:await db().closed_years.toArray(),counts:await db().counts.toArray(),reconciliation_balances:await db().reconciliation_balances.toArray()}; }
+async function backupData() { return {app:'GastronoAssets',version:4,exported_at:now(),fixed_assets:await db().fixed_assets.toArray(),settings:await getSettings(),audit:await db().audit.toArray(),closed_years:await db().closed_years.toArray(),counts:await db().counts.toArray(),reconciliation_balances:await db().reconciliation_balances.toArray(),posted_months:await db().posted_months.toArray()}; }
 export const localAssets={
   async list():Promise<AssetInput[]> { const settings=await getSettings(); return (await db().fixed_assets.toArray()).map(a=>normalizeAsset(a,settings.reportingCurrency)).sort((a,b)=>a.category.localeCompare(b.category)||a.purchase_date.localeCompare(b.purchase_date)); },
   async insert(items:NewAsset|NewAsset[]):Promise<string> {
@@ -95,11 +99,12 @@ export const localAssets={
     const settings={...DEFAULT_SETTINGS,...data.settings}; const rows:AssetRecord[]=data.fixed_assets.map((a:AssetRecord)=>normalizeAsset({...a,id:a.id||uuid()},settings.reportingCurrency));
     for(const a of rows) if(!(a.purchase_price>0)||!a.category||!a.purchase_date)throw new Error('Backup contains an invalid asset. No data has been changed.');
     await automaticSnapshot();
-    await db().transaction('rw',[db().fixed_assets,db().settings,db().audit,db().closed_years,db().counts,db().snapshots,db().reconciliation_balances],async()=>{
-      if(mode==='replace') {await db().fixed_assets.clear();await db().audit.clear();await db().closed_years.clear();await db().counts.clear();await db().reconciliation_balances.clear();}
+    await db().transaction('rw',[db().fixed_assets,db().settings,db().audit,db().closed_years,db().counts,db().snapshots,db().reconciliation_balances,db().posted_months],async()=>{
+      if(mode==='replace') {await db().fixed_assets.clear();await db().audit.clear();await db().closed_years.clear();await db().counts.clear();await db().reconciliation_balances.clear();await db().posted_months.clear();}
       await db().fixed_assets.bulkPut(rows); if(data.settings)await db().settings.put({id:'project',value:settings});
       if(data.audit)await db().audit.bulkPut(data.audit);if(data.closed_years)await db().closed_years.bulkPut(data.closed_years);if(data.counts)await db().counts.bulkPut(data.counts);
       if(data.reconciliation_balances)await db().reconciliation_balances.bulkPut(data.reconciliation_balances);
+      if(data.posted_months){for(const record of data.posted_months){const existing=await db().posted_months.get(record.id);if(existing&&mode==='merge')continue;await db().posted_months.put(record);}}
       if(data.snapshots)await db().snapshots.bulkPut(data.snapshots);await logChanges('project','Restore',{}, {mode,assets:rows.length});
     });await automaticSnapshot();return rows.length;
   }
@@ -119,10 +124,28 @@ export async function saveLedgerBalances(year:number,balances:LedgerBalances) {
  await db().reconciliation_balances.put({year,balances});await automaticSnapshot();
 }
 export async function closeYear(year:number) {
- await db().transaction('rw',[db().fixed_assets,db().settings,db().closed_years,db().audit,db().snapshots,db().counts,db().reconciliation_balances],async()=>{
+ await db().transaction('rw',[db().fixed_assets,db().settings,db().closed_years,db().audit,db().snapshots,db().counts,db().reconciliation_balances,db().posted_months],async()=>{
   if(await db().closed_years.get(year))throw new Error('Year already closed.');
   const settings=await getSettings(),schedules=await schedulesForYear(year,settings);
   await db().closed_years.add({year,date:now(),settings,schedules});
   await logChanges('project','Close year',{}, {year});await automaticSnapshot();
  });
+}
+export async function postMonth(year:number,month:number,initials:string){
+ if(!initials.trim())throw new Error('Enter posting initials.');
+ if(!Number.isInteger(year)||year<1900||year>9999||!Number.isInteger(month)||month<1||month>12)throw new Error('Invalid posting period.');
+ await db().transaction('rw',[db().fixed_assets,db().settings,db().closed_years,db().posted_months,db().audit],async()=>{
+  const id=`${year}-${String(month).padStart(2,'0')}`;
+  if(await db().posted_months.get(id))throw new Error('Month already posted.');
+  const settings=await getSettings(),voucher=createVoucher(await schedulesForYear(year,settings),year,month,settings);
+  const record:PostedMonth={id,year,month,postedAt:now(),initials:initials.trim(),amount:voucher.total,voucher};
+  await db().posted_months.add(record);await logChanges(id,'Post month',{},record);
+ });await automaticSnapshot();
+}
+export async function reopenMonth(id:string,initials:string){
+ if(!initials.trim())throw new Error('Enter posting initials.');
+ await db().transaction('rw',db().posted_months,db().audit,async()=>{
+  const old=await db().posted_months.get(id);if(!old)throw new Error('Month is not posted.');
+  await db().posted_months.delete(id);await logChanges(id,'Reopen month',old,{reopenedAt:now(),initials:initials.trim()});
+ });await automaticSnapshot();
 }
