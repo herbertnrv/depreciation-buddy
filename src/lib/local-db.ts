@@ -71,7 +71,7 @@ export const localAssets={
   },
   async update(id:string, patch:Partial<NewAsset>) {
     await db().transaction('rw',db().fixed_assets,db().audit,db().closed_years,async()=>{const old=await db().fixed_assets.get(id);if(!old)throw new Error('Asset not found.');
-      const next=normalizeAsset({...old,...patch,updated_at:now()});
+      const next:AssetRecord={...normalizeAsset({...old,...patch}),updated_at:now()};
       if(patch.rate_per_year!==undefined && patch.useful_life_months===undefined) {next.useful_life_months=patch.rate_per_year>0?12/patch.rate_per_year:0;next.method=patch.rate_per_year>0?'straight-line':'none';}
       if(patch.disposal_date!==undefined && patch.disposals_history===undefined) next.disposals_history=patch.disposal_date?[{date:patch.disposal_date,type:'Sale',fraction:1,proceeds:0,costs:0}]:[];
       const closed=(await db().closed_years.orderBy('year').last())?.year;
