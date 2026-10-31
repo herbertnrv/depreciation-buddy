@@ -1,0 +1,11 @@
+import 'fake-indexeddb/auto';
+import { beforeAll, it, expect } from 'vitest';
+import Dexie from 'dexie';
+import { db, localAssets, getSettings, closeYear, schedulesForYear } from './local-db';
+const legacy={id:'old',asset_number:'EQ-001',category:'Equipment',description:'Legacy fixture',location:'Hotel',purchase_date:'2026-03-15',purchase_price:100000000,rate_per_year:.2,disposal_date:null};
+beforeAll(async()=>{Object.defineProperty(globalThis,'window',{value:{},configurable:true});const old=new Dexie('gastrono_assets');old.version(1).stores({fixed_assets:'id, category, purchase_date, asset_number, location'});await old.table('fixed_assets').put(legacy);old.close();});
+it('v1 database upgrades without losing records',async()=>{const a=(await localAssets.list())[0];expect(a.description).toBe('Legacy fixture');expect(a.residual_value).toBe(0);expect(a.in_service_date).toBe('2026-03-15');expect((await getSettings()).reportingCurrency).toBe('LAK');});
+it('duplicate asset numbers are blocked',async()=>{await expect(localAssets.insert({...legacy,id:undefined} as never)).rejects.toThrow('already exists');});
+it('closed year is immutable and following year shows adjustment',async()=>{await closeYear(2026);const frozen=await schedulesForYear(2026);await localAssets.update('old',{purchase_price:120000000});expect((await schedulesForYear(2026))[0].closingNBV).toBe(frozen[0].closingNBV);const next=(await schedulesForYear(2027))[0];expect(next.openingNBV).toBe(frozen[0].closingNBV);expect(next.adjustment).toBeCloseTo(16666666.66666667);});
+it('audit and last 10 snapshots are included in backup',async()=>{for(let i=0;i<12;i++)await localAssets.update('old',{supplier:`Supplier ${i}`});const backup=JSON.parse(await localAssets.exportJson());expect(backup.snapshots).toHaveLength(10);expect(backup.audit.some((e:{field:string})=>e.field==='supplier')).toBe(true);expect(backup.closed_years).toHaveLength(1);});
+it('backup restoration keeps old and current data',async()=>{await localAssets.importJson(JSON.stringify({fixed_assets:[legacy]}),'merge');expect((await localAssets.list())[0].residual_value).toBe(0);});
