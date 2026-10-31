@@ -27,6 +27,7 @@ const de:Record<string,string>={
  'Allow a print window to open.':'Erlauben Sie das Öffnen eines Druckfensters.',
  'Complete all ledger accounts for':'Vervollständigen Sie alle Sachkonten für',
  'Acquisition':'Anschaffung','Prior-period adjustment':'Vorperiodenanpassung','Remove accumulated depreciation':'Kumulierte Abschreibung ausbuchen','Remove net book value':'Restbuchwert ausbuchen','Net disposal proceeds':'Nettoabgangserlös','Gain on disposal':'Abgangsgewinn','Loss on disposal':'Abgangsverlust',
+ 'Failed to load assets.':'Anlagegüter konnten nicht geladen werden.','No assets active in':'Keine aktiven Anlagegüter im Jahr','Deleted — adjustment':'Gelöscht — Anpassung',
  'Create':'Anlegen','Edit':'Bearbeiten',
  'cost':'Anschaffungskosten','accumulated':'Kumulierte Abschreibung','expense':'Abschreibungsaufwand','gain':'Gewinn','loss':'Verlust',
  'Cost difference':'AK-Differenz','Accumulated difference':'Differenz kumulierte Abschreibung','Category rollforward':'Kategorie-Fortschreibung','Transfers in':'Umbuchungen ein','Transfers out':'Umbuchungen aus','Transfer':'Umbuchung',

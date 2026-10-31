@@ -94,7 +94,7 @@ function valueFor(s: YearSchedule, key: SortKey): string | number {
     case "description": return s.asset.description ?? "";
     case "location": return s.asset.location ?? "";
     case "purchase_date": return s.asset.purchase_date ?? "";
-    case "costPurchase": return s.asset.purchase_price;
+    case "costPurchase": return s.closingCost;
     case "openingNBV": return s.openingNBV;
     case "additions": return s.additions;
     case "disposals": return s.disposals;
@@ -246,7 +246,7 @@ function SchedulePage() {
 
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" disabled={!!closed.data} onClick={async()=>{if(!confirm(settings.language==='DE'?`Jahr ${year} endgültig abschließen?`:`Close year ${year}? Figures will be frozen.`))return;try{await closeYear(year);await qc.invalidateQueries();}catch(e){toast.error((e as Error).message);}}}>{t(closed.data?'Closed':'Close year')}</Button>
+          <Button variant="outline" size="sm" disabled={!!closed.data} onClick={async()=>{if(!confirm(settings.language==='DE'?`Jahr ${year} endgültig abschließen?`:`Close year ${year}? Figures will be frozen.`))return;try{await closeYear(year);await qc.invalidateQueries();}catch(e){toast.error(t((e as Error).message));}}}>{t(closed.data?'Closed':'Close year')}</Button>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{t('Category')}</span>
             <Select value={category ?? "__all__"} onValueChange={setCategory}>
@@ -351,19 +351,19 @@ function SchedulePage() {
           <Button variant="ghost" size="sm" onClick={clearFilters}>{t('Clear')}</Button>
         )}
         <div className="ml-auto text-xs text-muted-foreground">
-          {schedules.length} of {allSchedules.length} assets
+          {schedules.length} {t("of")} {allSchedules.length} {t("Assets")}
         </div>
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Loading…</p>}
-      {error && <p className="text-destructive">Failed to load assets.</p>}
+      {isLoading && <p className="text-muted-foreground">{t("Loading…")}</p>}
+      {error && <p className="text-destructive">{t("Failed to load assets.")}</p>}
 
 
       {!isLoading && schedules.length === 0 && (
         <div className="rounded-lg border border-dashed border-border p-12 text-center">
-          <p className="text-muted-foreground">No assets active in {year}.</p>
+          <p className="text-muted-foreground">{t("No assets active in")} {year}.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Add assets in the "Assets" tab to populate the schedule.
+            {t("No assets yet")}
           </p>
         </div>
       )}
@@ -427,12 +427,12 @@ function SchedulePage() {
                         <td className="text-right p-2 font-mono border-l border-border">{fmt(s.closingAccumulated)}</td>
                       </tr>
                     ))}
-                    <SubtotalRow label={`Subtotal — ${category}`} totals={sub} monthly={subMonthly} tone="muted" />
+                    <SubtotalRow label={`${t("Subtotal")} — ${category}`} totals={sub} monthly={subMonthly} tone="muted" />
                   </FragmentGroup>
                 );
               })}
 
-              <SubtotalRow label="GRAND TOTAL" totals={totals} monthly={monthlyTotals} tone="grand" />
+              <SubtotalRow label={t("TOTAL")} totals={totals} monthly={monthlyTotals} tone="grand" />
             </tbody>
           </table>
         </div>
