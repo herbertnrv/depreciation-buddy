@@ -4,7 +4,6 @@ export type Journal={date:string;account:string;debit:number;credit:number;text:
 export function journalEntries(schedules:YearSchedule[],settings:Settings,monthly:boolean):Journal[]{const rows:Journal[]=[];
  const post=(s:YearSchedule,date:string,debit:string,credit:string,amount:number,text:string)=>{const n=roundMoney(Math.abs(amount),settings.reportingCurrency);if(!n)return;if(amount<0)[debit,credit]=[credit,debit];rows.push({date,account:debit,debit:n,credit:0,text,costCentre:s.costCentre},{date,account:credit,debit:0,credit:n,text,costCentre:s.costCentre});};
  for(const s of schedules){const mapping=settings.accounts[s.category];if(!mapping||Object.values(mapping).some(a=>!a.trim()))throw new Error(`Complete all ledger accounts for ${s.category} in Settings.`);
- const year=Number(s.asset.purchase_date.slice(0,4))+(s.openingCost?0:0);void year;
  const reportYear=(s as YearSchedule&{reportYear?:number}).reportYear||new Date().getFullYear();
  const label=`${s.asset.asset_number||s.asset.description}`;
  if(monthly)for(let i=0;i<12;i++){const day=new Date(Date.UTC(reportYear,i+1,0)).getUTCDate();post(s,`${reportYear}-${String(i+1).padStart(2,'0')}-${day}`,mapping.expense,mapping.accumulated,s.displayMonths[i],`Depreciation ${label}`);}

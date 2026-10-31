@@ -172,7 +172,7 @@ function SchedulePage() {
   const totals = useMemo(() => totalsOf(schedules), [schedules]);
   const monthlyTotals = useMemo(() => {
     const out = Array(12).fill(0);
-    for (const s of schedules) for (let i = 0; i < 12; i++) out[i] += s.months[i];
+    for (const s of schedules) for (let i = 0; i < 12; i++) out[i] += s.displayMonths[i];
     return out as number[];
   }, [schedules]);
 
@@ -395,7 +395,7 @@ function SchedulePage() {
               {groups.map(([category, rows]) => {
                 const sub = totalsOf(rows);
                 const subMonthly = Array(12).fill(0) as number[];
-                for (const r of rows) for (let i = 0; i < 12; i++) subMonthly[i] += r.months[i];
+                for (const r of rows) for (let i = 0; i < 12; i++) subMonthly[i] += r.displayMonths[i];
                 return (
                   <FragmentGroup key={category} category={category}>
                     {rows.map((s) => (

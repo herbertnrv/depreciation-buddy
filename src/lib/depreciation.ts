@@ -35,7 +35,7 @@ export function computeYearSchedule(input: AssetInput, reportYear: number, setti
   const life = a.useful_life_months || 0, monthly = life > 0 ? (cost - residual) / life : 0;
   const events = [...(a.disposals_history || [])].sort((x,y) => x.date.localeCompare(y.date));
   const impairments = [...(a.impairments || [])].sort((x,y) => x.date.localeCompare(y.date));
-  let fraction = 1, acc = 0, impairmentAcc = 0, elapsed = 0, balance = cost;
+  let fraction = 1, acc = 0, impairmentAcc = 0, elapsed = 0, balance = cost, unimpairedBalance = cost;
   let openingCost = 0, openingAccumulated = 0, openingNBV = 0;
   let disposals = 0, costRemoved = 0, disposalAccumulatedRemoved = 0, proceeds = 0, disposalCosts = 0, impairment = 0;
   const months = Array<number>(12).fill(0);
@@ -59,12 +59,16 @@ export function computeYearSchedule(input: AssetInput, reportYear: number, setti
           dep = a.method === 'declining-balance' ? Math.max(straight, balance * (a.declining_factor || 2) / life * w) : straight;
           dep = Math.min(available, dep); elapsed += Math.min(fullWeight, remainingLife);
           if (elapsed >= life - 1e-9 && here.length === 0) dep = available;
+          const unimpairedAvailable = Math.max(0, unimpairedBalance-residual*fraction);
+          const unimpairedStraight = unimpairedAvailable / remainingLife * w;
+          const unimpairedDep = a.method==='declining-balance' ? Math.min(unimpairedAvailable,Math.max(unimpairedStraight,unimpairedBalance*(a.declining_factor||2)/life*w)) : unimpairedStraight;
+          unimpairedBalance -= unimpairedDep;
           acc += dep; balance -= dep;
         }
       }
       if (y === reportYear) months[m-1] = dep;
       for (const e of impairments.filter(e => monthIndex(e.date) === idx)) {
-        const amount = e.reversal ? -Math.min(e.amount, impairmentAcc) : Math.min(e.amount, Math.max(0,balance-residual*fraction));
+        const amount = e.reversal ? -Math.min(e.amount, impairmentAcc,Math.max(0,unimpairedBalance-balance)) : Math.min(e.amount, Math.max(0,balance-residual*fraction));
         impairmentAcc += amount; balance -= amount;
         if (y === reportYear) impairment += amount;
       }
@@ -72,7 +76,7 @@ export function computeYearSchedule(input: AssetInput, reportYear: number, setti
         const removed = Math.min(fraction, e.fraction), ratio = fraction > 0 ? removed/fraction : 0;
         const nbv = balance * ratio, removedAcc = (acc + impairmentAcc) * ratio;
         if (y === reportYear) { disposals += nbv; costRemoved += cost * removed; disposalAccumulatedRemoved += removedAcc; proceeds += e.proceeds; disposalCosts += e.costs; }
-        acc *= 1-ratio; impairmentAcc *= 1-ratio; balance *= 1-ratio; fraction -= removed;
+        acc *= 1-ratio; impairmentAcc *= 1-ratio; balance *= 1-ratio; unimpairedBalance *= 1-ratio; fraction -= removed;
       }
     }
   }
