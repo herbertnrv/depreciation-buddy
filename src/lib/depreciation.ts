@@ -1,6 +1,7 @@
 import { type ExtendedAsset, type Settings, DEFAULT_SETTINGS, money, roundMoney } from './asset-model';
 export type AssetInput = ExtendedAsset & { id: string; asset_number: string | null; category: string; description: string; location: string | null; purchase_date: string; purchase_price: number; rate_per_year: number; disposal_date: string | null };
-export type YearSchedule = { asset: AssetInput; monthlyDepreciation: number; usefulLifeMonths: number; months: number[]; displayMonths: number[];
+export type DisposalMovement = { date:string; cost:number; accumulated:number; nbv:number; proceeds:number; costs:number; gainLoss:number };
+export type YearSchedule = { asset: AssetInput; monthlyDepreciation: number; usefulLifeMonths: number; months: number[]; displayMonths: number[]; disposalMovements?:DisposalMovement[]; impairmentMovements?:{date:string;amount:number}[]; costAdjustment?:number; accumulatedAdjustment?:number;
   openingCost: number; additions: number; disposals: number; closingCost: number; openingAccumulated: number; yearDepreciation: number;
   disposalAccumulatedRemoved: number; costRemoved: number; closingAccumulated: number; openingNBV: number; closingNBV: number;
   proceeds: number; disposalCosts: number; gainLoss: number; impairment: number; adjustment: number; status: string; category: string; costCentre: string };
@@ -39,6 +40,7 @@ export function computeYearSchedule(input: AssetInput, reportYear: number, setti
   let openingCost = 0, openingAccumulated = 0, openingNBV = 0;
   let disposals = 0, costRemoved = 0, disposalAccumulatedRemoved = 0, proceeds = 0, disposalCosts = 0, impairment = 0;
   const months = Array<number>(12).fill(0);
+  const disposalMovements:DisposalMovement[]=[], impairmentMovements:{date:string;amount:number}[]=[];
   const firstYear = Number(a.purchase_date.slice(0,4));
   for (let y = firstYear; y <= reportYear; y++) {
     if (y === reportYear && firstYear < reportYear) { openingCost = cost * fraction; openingAccumulated = acc + impairmentAcc; openingNBV = balance; }
@@ -70,12 +72,12 @@ export function computeYearSchedule(input: AssetInput, reportYear: number, setti
       for (const e of impairments.filter(e => monthIndex(e.date) === idx)) {
         const amount = e.reversal ? -Math.min(e.amount, impairmentAcc,Math.max(0,unimpairedBalance-balance)) : Math.min(e.amount, Math.max(0,balance-residual*fraction));
         impairmentAcc += amount; balance -= amount;
-        if (y === reportYear) impairment += amount;
+        if (y === reportYear) { impairment += amount; impairmentMovements.push({date:e.date,amount}); }
       }
       for (const e of here) {
         const removed = Math.min(fraction, e.fraction), ratio = fraction > 0 ? removed/fraction : 0;
         const nbv = balance * ratio, removedAcc = (acc + impairmentAcc) * ratio;
-        if (y === reportYear) { disposals += nbv; costRemoved += cost * removed; disposalAccumulatedRemoved += removedAcc; proceeds += e.proceeds; disposalCosts += e.costs; }
+        if (y === reportYear) { disposals += nbv; costRemoved += cost * removed; disposalAccumulatedRemoved += removedAcc; proceeds += e.proceeds; disposalCosts += e.costs; disposalMovements.push({date:e.date,cost:cost*removed,accumulated:removedAcc,nbv,proceeds:e.proceeds,costs:e.costs,gainLoss:e.proceeds-e.costs-nbv}); }
         acc *= 1-ratio; impairmentAcc *= 1-ratio; balance *= 1-ratio; unimpairedBalance *= 1-ratio; fraction -= removed;
       }
     }
@@ -87,7 +89,7 @@ export function computeYearSchedule(input: AssetInput, reportYear: number, setti
   const displayMonths = months.map(n => roundMoney(n,settings.reportingCurrency));
   displayMonths[11] += roundMoney(yearDepreciation,settings.reportingCurrency) - displayMonths.reduce((s,n)=>s+n,0);
   const transfer = (a.transfers || []).filter(t=>t.date<=`${reportYear}-12-31`).sort((x,y)=>x.date.localeCompare(y.date)).at(-1);
-  return { asset: a, monthlyDepreciation: monthly, usefulLifeMonths: life, months, displayMonths, openingCost, openingAccumulated, openingNBV,
+  return { asset: a, monthlyDepreciation: monthly, usefulLifeMonths: life, months, displayMonths, disposalMovements, impairmentMovements, openingCost, openingAccumulated, openingNBV,
     additions, disposals, costRemoved, closingCost, yearDepreciation, disposalAccumulatedRemoved, closingAccumulated: acc+impairmentAcc,
     closingNBV: Math.max(0,balance), proceeds, disposalCosts, gainLoss: proceeds-disposalCosts-disposals, impairment, adjustment: 0,
     status: fraction <= 1e-9 ? 'Disposed' : a.under_construction ? 'Under construction' : balance <= residual*fraction+1e-7 && a.method !== 'none' ? 'Fully depreciated' : 'Active',
