@@ -10,10 +10,10 @@ import { autoNumber, localAssets } from '@/lib/local-db';
 import { normalizeAsset, totalCost, type AssetInput } from '@/lib/depreciation';
 import { useSettings, useUnsaved } from '@/lib/settings-context';
 import { useT } from '@/lib/i18n';
-import { money } from '@/lib/asset-model';
+import { money,dateLabel } from '@/lib/asset-model';
 import { ASSETS_QUERY_KEY } from '@/lib/use-assets';
 import { toast } from 'sonner';
-export function Entry({label,value,onChange,type='text'}:{label:string;value:string|number;onChange:(s:string)=>void;type?:string}){const t=useT();return <Label className="grid gap-1.5">{t(label)}<Input aria-label={t(label)} value={value} type={type} onChange={e=>onChange(e.target.value)}/></Label>;}
+export function Entry({label,value,onChange,type='text'}:{label:string;value:string|number;onChange:(s:string)=>void;type?:string}){const t=useT();return <Label className="grid gap-1.5">{t(label)}<Input aria-label={t(label)} value={value} type={type} onChange={e=>onChange(e.target.value)}/>{type==='date'&&<span className="text-xs text-muted-foreground">{dateLabel(String(value))}</span>}</Label>;}
 export function Choice({label,value,options,onChange,labels}:{label:string;value:string;options:string[];onChange:(v:string)=>void;labels?:Record<string,string>}){const t=useT();return <Label className="grid gap-1.5">{t(label)}<Select value={value} onValueChange={onChange}><SelectTrigger aria-label={t(label)}><SelectValue/></SelectTrigger><SelectContent>{options.map(o=><SelectItem value={o} key={o}>{labels?.[o]||t(o)}</SelectItem>)}</SelectContent></Select></Label>;}
 function fresh(currency:string):AssetInput{return normalizeAsset({id:'',asset_number:null,category:'Furniture',description:'',location:null,purchase_date:new Date().toISOString().slice(0,10),purchase_price:0,rate_per_year:.2,disposal_date:null,currency});}
 export function AssetEditor({open,onClose,asset,assets}:{open:boolean;onClose:()=>void;asset:AssetInput|null;assets:AssetInput[]}) {
@@ -46,6 +46,6 @@ export function AssetEditor({open,onClose,asset,assets}:{open:boolean;onClose:()
  <Label className="grid gap-2 col-span-full">{t('Notes')}<Textarea value={form.notes||''} onChange={e=>set('notes',e.target.value)}/></Label>
  <Label className="grid gap-2 col-span-full">{t('Attachments')}<Input aria-label={t('Attachments')} type="file" multiple accept="image/*,.pdf" onChange={async e=>{const files=Array.from(e.target.files||[]);try{const attachments=await Promise.all(files.map(file=>new Promise<{name:string;type:string;data:string}>((resolve,reject)=>{if(file.size>10*1024*1024){reject(new Error('Maximum attachment size is 10 MB.'));return;}const r=new FileReader();r.onload=()=>resolve({name:file.name,type:file.type,data:String(r.result)});r.onerror=()=>reject(r.error);r.readAsDataURL(file);})));set('attachments',[...(form.attachments||[]),...attachments]);}catch(e){setError((e as Error).message);}}}/>
  {(form.attachments||[]).map((a,i)=><div className="flex justify-between" key={`${a.name}-${i}`}><a href={a.data} download={a.name} className="underline">{a.name}</a><Button variant="ghost" size="sm" onClick={()=>set('attachments',form.attachments?.filter((_,n)=>n!==i))}>{t('Delete')}</Button></div>)}</Label>
- </div>{error&&<p role="alert" className="text-destructive">{error}</p>}
+ </div>{error&&<p role="alert" className="text-destructive">{t(error)}</p>}
  <DialogFooter><Button variant="outline" onClick={close}>{t('Cancel')}</Button><Button onClick={save} disabled={busy}>{t('Save')}</Button></DialogFooter></DialogContent></Dialog>;
 }
