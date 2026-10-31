@@ -1,3 +1,4 @@
+import { Controls } from '@/components/register/controls';
 import { SummaryDialog } from '@/components/register/summary-dialog';
 import { useSettings } from '@/lib/settings-context';
 import { useT } from '@/lib/i18n';
@@ -437,6 +438,7 @@ function SchedulePage() {
         </div>
       )}
 
+      <Controls schedules={allSchedules} year={year}/>
       <SummaryDialog
         open={summaryOpen}
         onOpenChange={setSummaryOpen}
