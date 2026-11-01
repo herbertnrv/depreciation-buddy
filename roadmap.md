@@ -1,8 +1,8 @@
 # Required register improvements
 
 ## Annual additions overview
-- [ ] Add annual totals and all acquisitions for the selected purchase year, with local PDF/Excel/print exports.
-- [ ] Test year selection, cost totals and disposed/under-construction acquisitions; verify the page in the browser.
+- [x] Add annual totals and all acquisitions for the selected purchase year, with local PDF/Excel/print exports.
+- [x] Test year selection, cost totals and disposed/under-construction acquisitions; browser-verified import, year changes, EN/DE and PDF/Excel downloads; 18 related tests passed.
 
 ## Monthly posting vouchers (new request)
 - [x] Add /monthly with category totals, journal proposal, changes, detail and 12-month overview using unchanged schedule values.
