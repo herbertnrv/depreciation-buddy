@@ -42,6 +42,7 @@ function AppLayout() {
             {link("/schedule", "Depreciation Schedule")}
             {link("/monthly", "Monthly Depreciation")}
             {link("/assets", "Assets")}
+            {link("/additions", "Annual additions")}
             <SettingsDialog/>
             <Button variant="outline" size="sm" aria-label="Language EN/DE" onClick={async()=>{await update({...settings,language:settings.language==='EN'?'DE':'EN'});}}>{settings.language} / {settings.language==='EN'?'DE':'EN'}</Button>
           </nav>

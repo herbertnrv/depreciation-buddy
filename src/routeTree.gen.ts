@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppAdditionsRouteImport } from './routes/_app.additions'
 import { Route as AppAssetsRouteImport } from './routes/_app.assets'
 import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppScheduleRouteImport } from './routes/_app.schedule'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppAdditionsRoute = AppAdditionsRouteImport.update({
+  id: '/additions',
+  path: '/additions',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppAssetsRoute = AppAssetsRouteImport.update({
   id: '/assets',
@@ -42,12 +48,14 @@ const AppScheduleRoute = AppScheduleRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/additions': typeof AppAdditionsRoute
   '/assets': typeof AppAssetsRoute
   '/monthly': typeof AppMonthlyRoute
   '/schedule': typeof AppScheduleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/additions': typeof AppAdditionsRoute
   '/assets': typeof AppAssetsRoute
   '/monthly': typeof AppMonthlyRoute
   '/schedule': typeof AppScheduleRoute
@@ -56,19 +64,21 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/_app/additions': typeof AppAdditionsRoute
   '/_app/assets': typeof AppAssetsRoute
   '/_app/monthly': typeof AppMonthlyRoute
   '/_app/schedule': typeof AppScheduleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/assets' | '/monthly' | '/schedule'
+  fullPaths: '/' | '/additions' | '/assets' | '/monthly' | '/schedule'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/assets' | '/monthly' | '/schedule'
+  to: '/' | '/additions' | '/assets' | '/monthly' | '/schedule'
   id:
     | '__root__'
     | '/'
     | '/_app'
+    | '/_app/additions'
     | '/_app/assets'
     | '/_app/monthly'
     | '/_app/schedule'
@@ -95,6 +105,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/additions': {
+      id: '/_app/additions'
+      path: '/additions'
+      fullPath: '/additions'
+      preLoaderRoute: typeof AppAdditionsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/assets': {
       id: '/_app/assets'
       path: '/assets'
@@ -120,12 +137,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAdditionsRoute: typeof AppAdditionsRoute
   AppAssetsRoute: typeof AppAssetsRoute
   AppMonthlyRoute: typeof AppMonthlyRoute
   AppScheduleRoute: typeof AppScheduleRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAdditionsRoute: AppAdditionsRoute,
   AppAssetsRoute: AppAssetsRoute,
   AppMonthlyRoute: AppMonthlyRoute,
   AppScheduleRoute: AppScheduleRoute,
