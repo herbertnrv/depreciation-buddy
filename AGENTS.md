@@ -19,3 +19,4 @@
 - Persist ledger reconciliation balances by year in IndexedDB and include them in backup/restore to retain accounting checks offline.
 - Protect dirty forms with TanStack navigation blockers; keep ISO date values in storage and show dd.mm.yyyy alongside native date controls.
 - Derive monthly vouchers from schedule displayMonths without changing the engine; persist entire posted vouchers in IndexedDB with backups and compare against live recalculation to expose differences.
+- Keep annual acquisition reports at /additions based on purchase-year master records (including disposals and construction), using shared totalCost without changing depreciation; exports use the same pure selection.
