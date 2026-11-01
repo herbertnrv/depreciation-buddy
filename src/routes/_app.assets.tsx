@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Upload, AlertCircle, Download, FolderUp, PackageMinus } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, AlertCircle, Download, FolderUp, PackageMinus, Search } from "lucide-react";
 import { parseAssetWorkbook, type ParsedAsset } from "@/lib/import-xlsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -47,7 +47,9 @@ function AssetsPage() {
   const [purchasedFrom,setPurchasedFrom]=useState(''),[purchasedTo,setPurchasedTo]=useState('');
   const invalidRange=Boolean(purchasedFrom&&purchasedTo&&purchasedTo<purchasedFrom);
   const visibleAssets=invalidRange?[]:assets.filter(a=>(!purchasedFrom||a.purchase_date>=purchasedFrom)&&(!purchasedTo||a.purchase_date<=purchasedTo));
-  return <div className="space-y-5"><div className="flex flex-wrap justify-between gap-3"><h2 className="text-2xl font-semibold">{t('Assets')}</h2><div className="flex flex-wrap gap-2"><BackupButton/><RestoreButton/><ImportButton/><Button variant="outline" onClick={()=>exportAllExcel(assets,settings)}>{t('Export all data as Excel')}</Button><AuditDialog/><AssetEvents assets={assets}/><Button onClick={()=>{setEditing(null);setOpen(true);}}><Plus className="size-4 mr-2"/>{t('Add asset')}</Button></div></div>
+  return <div className="space-y-5"><h2 className="text-2xl font-semibold">{t('Assets')}</h2>
+  <section aria-labelledby="purchase-search-heading" className="border-y border-border bg-muted/40 py-4">
+  <h3 id="purchase-search-heading" className="mb-3 flex items-center gap-2 font-semibold"><Search className="size-5 text-primary"/>{t('Search by purchase date')}</h3>
   <div className="flex flex-wrap items-end gap-3">
     <div className="space-y-1"><Label htmlFor="purchased-from">{t('Purchased from')}</Label><Input id="purchased-from" type="date" value={purchasedFrom} max={purchasedTo||undefined} onChange={e=>setPurchasedFrom(e.target.value)} className="w-44"/><p className="text-xs text-muted-foreground">{dateLabel(purchasedFrom)}</p></div>
     <div className="space-y-1"><Label htmlFor="purchased-to">{t('Purchased to')}</Label><Input id="purchased-to" type="date" value={purchasedTo} min={purchasedFrom||undefined} onChange={e=>setPurchasedTo(e.target.value)} className="w-44"/><p className="text-xs text-muted-foreground">{dateLabel(purchasedTo)}</p></div>
@@ -55,6 +57,8 @@ function AssetsPage() {
     <p className="text-sm text-muted-foreground mb-5" aria-live="polite">{t('Number of assets')}: {visibleAssets.length} / {assets.length}</p>
   </div>
   {invalidRange&&<p role="alert" className="text-sm text-destructive">{t('The end date must not precede the start date.')}</p>}
+  </section>
+  <div className="flex flex-wrap gap-2"><BackupButton/><RestoreButton/><ImportButton/><Button variant="outline" onClick={()=>exportAllExcel(assets,settings)}>{t('Export all data as Excel')}</Button><AuditDialog/><AssetEvents assets={assets}/><Button onClick={()=>{setEditing(null);setOpen(true);}}><Plus className="size-4 mr-2"/>{t('Add asset')}</Button></div>
   {isLoading&&<p>{t('Loading…')}</p>}
   <div className="overflow-auto border border-border rounded-md"><table className="w-full text-sm"><thead className="bg-muted"><tr>{['Category','Asset number','Description','Location','Purchased','Total cost','Status','Cost centre','Action'].map(x=><th key={x} className={`p-3 whitespace-nowrap ${x==='Total cost'?'text-right':'text-left'}`}>{t(x)}</th>)}</tr></thead><tbody>{visibleAssets.map(a=>{const status=computeYearSchedule(a,new Date().getFullYear(),settings).status;return <tr className="border-t border-border" key={a.id}><td className="p-3">{a.category}</td><td className="p-3">{a.asset_number||'–'}</td><td className="p-3 font-medium">{a.description}{totalCost(a)<settings.threshold&&<p className="text-destructive text-xs">{t('Low-value, expense directly')}</p>}</td><td className="p-3">{a.location||'–'}</td><td className="p-3 whitespace-nowrap">{dateLabel(a.purchase_date)}</td><td className="p-3 text-right font-mono">{money(totalCost(a),settings.reportingCurrency)}</td><td className="p-3 whitespace-nowrap">{t(status)}{a.disposal_date&&<p className="text-xs">{dateLabel(a.disposal_date)}</p>}</td><td className="p-3">{a.cost_centre}</td><td className="p-3"><div className="flex gap-1"><Button aria-label={t('Edit asset')} variant="ghost" size="icon" onClick={()=>{setEditing(a);setOpen(true);}}><Pencil className="size-4"/></Button><Button aria-label={t('Delete')} variant="ghost" size="icon" onClick={async()=>{if(confirm(settings.language==='DE'?`„${a.description}“ löschen?`:`Delete "${a.description}"?`)){await localAssets.remove(a.id);await qc.invalidateQueries({queryKey:ASSETS_QUERY_KEY,refetchType:'all'});}}}><Trash2 className="size-4 text-destructive"/></Button><AuditDialog assetId={a.id}/></div></td></tr>;})}</tbody></table></div>
   {assets.length>0&&visibleAssets.length===0&&!isLoading&&!invalidRange&&<p className="text-muted-foreground">{t('No matching assets')}</p>}
